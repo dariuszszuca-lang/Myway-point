@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { 
@@ -119,12 +119,12 @@ function MainLayout() {
 
 
 function NavItem({ icon, label, to }: { icon: any, label: string, to: string }) {
-    const location = window.location;
+    const location = useLocation();
     const active = location.pathname === to;
 
     return (
-        <a 
-        href={to}
+        <Link 
+        to={to}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
             active 
             ? 'bg-myway-primary text-white shadow-lg shadow-teal-900/20' 
@@ -133,7 +133,7 @@ function NavItem({ icon, label, to }: { icon: any, label: string, to: string }) 
         >
         <span className={`transition-transform duration-200 ${active ? 'scale-110' : 'group-hover:scale-110'}`}>{icon}</span>
         <span className="hidden lg:block font-medium">{label}</span>
-        </a>
+        </Link>
     );
 }
 
