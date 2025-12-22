@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Users, 
@@ -6,7 +6,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Plus,
-  Mail,
   User,
   Settings,
   LayoutDashboard,
