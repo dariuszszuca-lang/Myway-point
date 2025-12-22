@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { getPatients, addPatient, updatePatient, deletePatient } from '../services/patientService';
 import { Patient } from '../types';
 import { PatientModal } from '../components/PatientModal';
-import { MoreVertical, User, Plus, CheckCircle2, Activity } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, CheckCircle2, Activity } from 'lucide-react';
 
 export function PatientsPage() {
     const [patients, setPatients] = useState<Patient[]>([]);
