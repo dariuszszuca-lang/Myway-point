@@ -1,0 +1,5 @@
+# SSH keys
+.ssh/
+
+# Environment variables
+.env.local
