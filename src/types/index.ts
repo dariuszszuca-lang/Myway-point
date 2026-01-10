@@ -2,28 +2,103 @@ export interface Therapist {
   id: string;
   name: string;
   specialization: string;
+  color: string; // For calendar display
+  avatar?: string;
 }
 
 export interface Patient {
   id: string;
   name: string;
+  phone?: string;
+  email?: string;
   totalSessions: number;
   usedSessions: number;
-  sessionsHistory: Session[];
+  sessionsHistory: string[]; // Session IDs
+  notes?: string;
+  createdAt: number;
 }
+
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
 
 export interface Session {
   id: string;
   patientId: string;
+  patientName: string; // Denormalized for quick display
   therapistId: string;
-  startTime: string; // ISO string
-  endTime: string;   // ISO string
-  status: 'scheduled' | 'completed' | 'cancelled';
+  therapistName: string; // Denormalized for quick display
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  status: SessionStatus;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Availability {
+  id: string;
   therapistId: string;
-  dayOfWeek: number; // 0-6
+  dayOfWeek: number; // 0 = Sunday, 1 = Monday, etc.
   startTime: string; // HH:mm
-  endTime: string;   // HH:mm
+  endTime: string; // HH:mm
+  isActive: boolean;
 }
+
+// For creating new sessions
+export interface CreateSessionData {
+  patientId: string;
+  patientName: string;
+  therapistId: string;
+  therapistName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  notes?: string;
+}
+
+// Dashboard stats
+export interface DashboardStats {
+  todaySessions: number;
+  weekSessions: number;
+  totalPatients: number;
+  completedThisMonth: number;
+}
+
+// Calendar view types
+export interface CalendarDay {
+  date: Date;
+  sessions: Session[];
+  isToday: boolean;
+  isCurrentMonth: boolean;
+}
+
+export interface TimeSlot {
+  time: string; // HH:mm
+  sessions: Session[];
+}
+
+// Default therapists for MyWay
+export const DEFAULT_THERAPISTS: Omit<Therapist, 'id'>[] = [
+  {
+    name: 'Krystian Nagaba',
+    specialization: 'Terapeuta uzależnień',
+    color: '#0f766e', // teal
+  },
+  {
+    name: 'Natalia Pucz',
+    specialization: 'Terapeutka',
+    color: '#7c3aed', // violet
+  },
+  {
+    name: 'Terapeuta 3',
+    specialization: 'Terapeuta',
+    color: '#ea580c', // orange
+  },
+];
+
+// Working hours
+export const WORKING_HOURS = {
+  start: 8, // 8:00
+  end: 20, // 20:00
+  slotDuration: 60, // minutes
+};

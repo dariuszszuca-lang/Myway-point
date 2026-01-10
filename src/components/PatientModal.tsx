@@ -25,11 +25,12 @@ export function PatientModal({ isOpen, onClose, onSave, patientToEdit }: Patient
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({ 
-        name, 
+    onSave({
+        name,
         totalSessions: Number(totalSessions),
         usedSessions: patientToEdit ? patientToEdit.usedSessions : 0,
-        sessionsHistory: patientToEdit ? patientToEdit.sessionsHistory : []
+        sessionsHistory: patientToEdit ? patientToEdit.sessionsHistory : [],
+        createdAt: patientToEdit ? patientToEdit.createdAt : Date.now(),
     });
     onClose();
   };
