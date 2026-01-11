@@ -24,6 +24,33 @@ export const initializeDefaultTherapists = async (): Promise<void> => {
   }
 };
 
+// Reset and reinitialize therapists with defaults
+export const resetTherapistsToDefault = async (): Promise<void> => {
+  // Delete all existing therapists
+  const existingTherapists = await getDocs(therapistsCollectionRef);
+  for (const doc of existingTherapists.docs) {
+    await deleteDoc(doc.ref);
+  }
+  // Add default therapists
+  await initializeDefaultTherapists();
+};
+
+// Ensure correct therapists exist (call on app init)
+export const ensureTherapistsExist = async (): Promise<void> => {
+  const data = await getDocs(therapistsCollectionRef);
+  const therapists = data.docs.map(doc => doc.data());
+
+  // Check if we have the correct 3 therapists
+  const expectedNames = ['Krystian Nagaba', 'Natalia Pucz', 'Waldemar Sikorski'];
+  const currentNames = therapists.map(t => t.name);
+
+  const hasAllTherapists = expectedNames.every(name => currentNames.includes(name));
+
+  if (!hasAllTherapists || therapists.length === 0) {
+    await resetTherapistsToDefault();
+  }
+};
+
 export const addTherapist = async (therapistData: Omit<Therapist, 'id'>): Promise<Therapist> => {
   const docRef = await addDoc(therapistsCollectionRef, therapistData);
   return { ...therapistData, id: docRef.id };

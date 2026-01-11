@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession } from '../services/sessionService';
-import { getTherapists, getTherapistColor } from '../services/therapistService';
+import { getTherapists, getTherapistColor, ensureTherapistsExist } from '../services/therapistService';
 import { getPatients } from '../services/patientService';
 import { Session, Therapist, Patient, WORKING_HOURS, CreateSessionData } from '../types';
 
@@ -61,6 +61,9 @@ export function CalendarPage() {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Ensure default therapists exist
+      await ensureTherapistsExist();
+
       const [sessionsData, therapistsData, patientsData] = await Promise.all([
         getSessionsByDateRange(weekStart, weekEnd),
         getTherapists(),
