@@ -23,7 +23,7 @@ export function TherapistsPage() {
         const name = prompt("Podaj imię i nazwisko terapeuty:");
         if (name) {
             const specialization = prompt("Podaj specjalizację:") || "Terapeuta";
-            await addTherapist({ name, specialization });
+            await addTherapist({ name, specialization, color: '' });
             loadTherapists();
         }
     };

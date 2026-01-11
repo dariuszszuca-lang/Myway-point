@@ -18,7 +18,6 @@ import { getPatients } from '../services/patientService';
 import { Session, Therapist, Patient, WORKING_HOURS, CreateSessionData } from '../types';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
-const FULL_DAYS = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
 
 // Generate time slots
 const generateTimeSlots = () => {
@@ -151,10 +150,6 @@ export function CalendarPage() {
   };
 
   const getTherapistIndex = (id: string) => therapists.findIndex(t => t.id === id);
-
-  const filteredTherapists = selectedTherapist === 'all'
-    ? therapists
-    : therapists.filter(t => t.id === selectedTherapist);
 
   return (
     <div className="space-y-6 animate-fade-in">

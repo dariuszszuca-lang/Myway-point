@@ -8,8 +8,7 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
-  Timestamp
+  orderBy
 } from 'firebase/firestore';
 import { Session, CreateSessionData, SessionStatus } from '../types';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';

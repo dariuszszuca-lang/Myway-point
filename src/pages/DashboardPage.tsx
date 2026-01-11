@@ -10,11 +10,10 @@ import {
   Plus,
   ArrowRight,
   CheckCircle2,
-  XCircle,
   AlertCircle,
   Activity
 } from 'lucide-react';
-import { getTodaySessions, getWeekSessions, getDashboardStats } from '../services/sessionService';
+import { getTodaySessions, getDashboardStats } from '../services/sessionService';
 import { getPatients } from '../services/patientService';
 import { getTherapists, getTherapistColor } from '../services/therapistService';
 import { Session, Therapist, Patient } from '../types';
@@ -57,7 +56,6 @@ export function DashboardPage() {
   const today = new Date();
   const formattedDate = format(today, "EEEE, d MMMM yyyy", { locale: pl });
 
-  const getTherapistById = (id: string) => therapists.find(t => t.id === id);
   const getTherapistIndex = (id: string) => therapists.findIndex(t => t.id === id);
 
   const getStatusBadge = (status: Session['status']) => {
@@ -183,7 +181,7 @@ export function DashboardPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {todaySessions.map((session, idx) => {
+              {todaySessions.map((session) => {
                 const therapistIndex = getTherapistIndex(session.therapistId);
                 const colors = getTherapistColor(therapistIndex);
 
