@@ -1,20 +1,30 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus } from 'lucide-react';
+import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus, CheckCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export function LoginPage() {
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const auth = getAuth();
+
+  // Jeśli użytkownik jest zalogowany, przekieruj do dashboardu
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     if (isRegister) {
       // Rejestracja
@@ -30,6 +40,8 @@ export function LoginPage() {
       }
       try {
         await createUserWithEmailAndPassword(auth, email, password);
+        setSuccess('Konto utworzone! Przekierowuję do panelu...');
+        // Przekierowanie nastąpi automatycznie przez sprawdzenie user w useAuth
       } catch (err: any) {
         if (err.code === 'auth/email-already-in-use') {
           setError('Ten e-mail jest już zarejestrowany');
@@ -55,6 +67,7 @@ export function LoginPage() {
   const toggleMode = () => {
     setIsRegister(!isRegister);
     setError('');
+    setSuccess('');
     setConfirmPassword('');
   };
 
@@ -142,6 +155,13 @@ export function LoginPage() {
             {error && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
                 <p className="text-rose-600 text-sm font-medium text-center">{error}</p>
+              </div>
+            )}
+
+            {success && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <p className="text-emerald-600 text-sm font-medium">{success}</p>
               </div>
             )}
 
