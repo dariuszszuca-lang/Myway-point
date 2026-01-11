@@ -163,18 +163,6 @@ export function CalendarPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Therapist filter */}
-          <select
-            value={selectedTherapist}
-            onChange={(e) => setSelectedTherapist(e.target.value)}
-            className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
-          >
-            <option value="all">Wszyscy terapeuci</option>
-            {therapists.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-
           {/* Navigation */}
           <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden">
             <button
@@ -199,21 +187,60 @@ export function CalendarPage() {
         </div>
       </div>
 
-      {/* Therapist legend */}
-      <div className="flex flex-wrap gap-3">
+      {/* Therapist Tabs */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2 flex-wrap">
+        <button
+          onClick={() => setSelectedTherapist('all')}
+          className={`px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
+            selectedTherapist === 'all'
+              ? 'bg-slate-800 text-white shadow-lg'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Wszyscy
+        </button>
         {therapists.map((therapist, idx) => {
           const colors = getTherapistColor(idx);
+          const isActive = selectedTherapist === therapist.id;
           return (
-            <div
+            <button
               key={therapist.id}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${colors.bg} ${colors.text} border ${colors.border}`}
+              onClick={() => setSelectedTherapist(therapist.id)}
+              className={`px-5 py-3 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${
+                isActive
+                  ? `${colors.dot} text-white shadow-lg`
+                  : `${colors.bg} ${colors.text} hover:shadow-md border ${colors.border}`
+              }`}
             >
-              <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+              <div className={`w-2.5 h-2.5 rounded-full ${isActive ? 'bg-white' : colors.dot}`} />
               {therapist.name}
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {/* Selected therapist info */}
+      {selectedTherapist !== 'all' && (
+        <div className="bg-gradient-to-r from-myway-primary to-teal-600 rounded-2xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl font-bold">
+                {therapists.find(t => t.id === selectedTherapist)?.name.charAt(0)}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">{therapists.find(t => t.id === selectedTherapist)?.name}</h2>
+                <p className="text-white/70">{therapists.find(t => t.id === selectedTherapist)?.specialization}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-3xl font-bold">
+                {sessions.filter(s => s.therapistId === selectedTherapist && s.status !== 'cancelled').length}
+              </p>
+              <p className="text-sm text-white/70">sesji w tym tygodniu</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Calendar Grid */}
       {loading ? (
@@ -285,10 +312,19 @@ export function CalendarPage() {
                         </div>
                       ) : (
                         <button
-                          onClick={() => openNewSessionModal(day, time)}
-                          className="absolute inset-1 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 bg-slate-100 hover:bg-slate-200 transition-all"
+                          onClick={() => openNewSessionModal(day, time, selectedTherapist !== 'all' ? selectedTherapist : undefined)}
+                          className={`absolute inset-1 flex items-center justify-center rounded-lg transition-all border-2 border-dashed ${
+                            selectedTherapist !== 'all'
+                              ? 'border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100 hover:border-emerald-400'
+                              : 'border-transparent opacity-0 group-hover:opacity-100 group-hover:border-slate-200 bg-slate-50 hover:bg-slate-100'
+                          }`}
                         >
-                          <Plus size={16} className="text-slate-400" />
+                          <div className={`flex items-center gap-1 ${selectedTherapist !== 'all' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            <Plus size={14} />
+                            <span className="text-xs font-medium">
+                              {selectedTherapist !== 'all' ? 'Wolne' : ''}
+                            </span>
+                          </div>
                         </button>
                       )}
                     </div>
@@ -308,7 +344,7 @@ export function CalendarPage() {
             {/* Modal header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-800">
-                {modalMode === 'create' ? 'Nowa sesja' : 'Szczegóły sesji'}
+                {modalMode === 'create' ? 'Zapisz pacjenta na wizytę' : 'Szczegóły sesji'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -322,41 +358,60 @@ export function CalendarPage() {
             <div className="p-6 space-y-4">
               {modalMode === 'create' ? (
                 <>
+                  {/* Therapist info - if selected */}
+                  {selectedTherapist !== 'all' && newSessionData.therapistId && (
+                    <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-myway-primary to-teal-600 rounded-xl text-white">
+                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-xl font-bold">
+                        {newSessionData.therapistName?.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold">{newSessionData.therapistName}</p>
+                        <p className="text-sm text-white/70">
+                          {therapists.find(t => t.id === newSessionData.therapistId)?.specialization}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Date & Time display */}
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                    <Calendar size={18} className="text-slate-500" />
-                    <span className="text-sm font-medium text-slate-700">
-                      {newSessionData.date && format(parseISO(newSessionData.date), 'EEEE, d MMMM yyyy', { locale: pl })}
-                    </span>
-                    <span className="text-sm text-slate-500">
-                      {newSessionData.startTime} - {newSessionData.endTime}
-                    </span>
+                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                    <Calendar size={20} className="text-myway-primary" />
+                    <div>
+                      <p className="text-sm font-bold text-slate-700">
+                        {newSessionData.date && format(parseISO(newSessionData.date), 'EEEE, d MMMM yyyy', { locale: pl })}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        Godzina: {newSessionData.startTime} - {newSessionData.endTime}
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Therapist select */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Terapeuta</label>
-                    <select
-                      value={newSessionData.therapistId || ''}
-                      onChange={(e) => {
-                        const therapist = therapists.find(t => t.id === e.target.value);
-                        setNewSessionData(prev => ({
-                          ...prev,
-                          therapistId: e.target.value,
-                          therapistName: therapist?.name,
-                        }));
-                      }}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
-                    >
-                      {therapists.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Therapist select - only if "all" view */}
+                  {selectedTherapist === 'all' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Terapeuta</label>
+                      <select
+                        value={newSessionData.therapistId || ''}
+                        onChange={(e) => {
+                          const therapist = therapists.find(t => t.id === e.target.value);
+                          setNewSessionData(prev => ({
+                            ...prev,
+                            therapistId: e.target.value,
+                            therapistName: therapist?.name,
+                          }));
+                        }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                      >
+                        {therapists.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Patient select */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Pacjent</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Wybierz pacjenta</label>
                     <select
                       value={newSessionData.patientId || ''}
                       onChange={(e) => {
@@ -367,13 +422,23 @@ export function CalendarPage() {
                           patientName: patient?.name,
                         }));
                       }}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20 text-base"
                     >
-                      <option value="">Wybierz pacjenta...</option>
-                      {patients.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
+                      <option value="">-- Wybierz pacjenta --</option>
+                      {patients.map(p => {
+                        const remaining = p.totalSessions - p.usedSessions;
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({remaining} sesji pozostało)
+                          </option>
+                        );
+                      })}
                     </select>
+                    {patients.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        Brak pacjentów. Dodaj pacjenta w zakładce "Pacjenci".
+                      </p>
+                    )}
                   </div>
 
                   {/* Notes */}
@@ -449,9 +514,9 @@ export function CalendarPage() {
                   </button>
                   <button
                     onClick={handleCreateSession}
-                    className="flex-1 py-3 px-4 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors"
+                    className="flex-1 py-3 px-4 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/20"
                   >
-                    Utwórz sesję
+                    Zapisz na wizytę
                   </button>
                 </>
               ) : selectedSession && (
