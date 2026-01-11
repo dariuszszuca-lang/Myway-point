@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Patient } from '../types';
+import { Patient, DEFAULT_SESSIONS_PACKAGE } from '../types';
 import { X } from 'lucide-react';
 
 interface PatientModalProps {
@@ -11,7 +11,7 @@ interface PatientModalProps {
 
 export function PatientModal({ isOpen, onClose, onSave, patientToEdit }: PatientModalProps) {
   const [name, setName] = useState('');
-  const [totalSessions, setTotalSessions] = useState(20);
+  const [totalSessions, setTotalSessions] = useState(DEFAULT_SESSIONS_PACKAGE);
 
   useEffect(() => {
     if (patientToEdit) {
@@ -19,7 +19,7 @@ export function PatientModal({ isOpen, onClose, onSave, patientToEdit }: Patient
       setTotalSessions(patientToEdit.totalSessions);
     } else {
       setName('');
-      setTotalSessions(20);
+      setTotalSessions(DEFAULT_SESSIONS_PACKAGE);
     }
   }, [patientToEdit, isOpen]);
 

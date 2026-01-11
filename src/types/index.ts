@@ -90,11 +90,14 @@ export const DEFAULT_THERAPISTS: Omit<Therapist, 'id'>[] = [
     color: '#7c3aed', // violet
   },
   {
-    name: 'Terapeuta 3',
-    specialization: 'Terapeuta',
+    name: 'Waldemar Sikorski',
+    specialization: 'Terapeuta uzależnień',
     color: '#ea580c', // orange
   },
 ];
+
+// Domyślna liczba sesji w pakiecie
+export const DEFAULT_SESSIONS_PACKAGE = 20;
 
 // Working hours
 export const WORKING_HOURS = {
