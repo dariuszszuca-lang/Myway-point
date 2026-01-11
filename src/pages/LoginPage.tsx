@@ -1,25 +1,61 @@
 import { useState } from 'react';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users } from 'lucide-react';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus } from 'lucide-react';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRegister, setIsRegister] = useState(false);
   const auth = getAuth();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
-      setError('Nieprawidłowy e-mail lub hasło');
-      console.error(err);
+
+    if (isRegister) {
+      // Rejestracja
+      if (password !== confirmPassword) {
+        setError('Hasła nie są identyczne');
+        setLoading(false);
+        return;
+      }
+      if (password.length < 6) {
+        setError('Hasło musi mieć minimum 6 znaków');
+        setLoading(false);
+        return;
+      }
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } catch (err: any) {
+        if (err.code === 'auth/email-already-in-use') {
+          setError('Ten e-mail jest już zarejestrowany');
+        } else if (err.code === 'auth/invalid-email') {
+          setError('Nieprawidłowy adres e-mail');
+        } else {
+          setError('Błąd rejestracji. Spróbuj ponownie');
+        }
+        console.error(err);
+      }
+    } else {
+      // Logowanie
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (err: any) {
+        setError('Nieprawidłowy e-mail lub hasło');
+        console.error(err);
+      }
     }
     setLoading(false);
+  };
+
+  const toggleMode = () => {
+    setIsRegister(!isRegister);
+    setError('');
+    setConfirmPassword('');
   };
 
   return (
@@ -40,12 +76,16 @@ export function LoginPage() {
 
           {/* Welcome text */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">Witaj ponownie</h2>
-            <p className="text-slate-500">Zaloguj się do panelu terapeuty</p>
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">
+              {isRegister ? 'Utwórz konto' : 'Witaj ponownie'}
+            </h2>
+            <p className="text-slate-500">
+              {isRegister ? 'Zarejestruj się w systemie' : 'Zaloguj się do panelu terapeuty'}
+            </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Adres e-mail
@@ -80,6 +120,25 @@ export function LoginPage() {
               </div>
             </div>
 
+            {isRegister && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Powtórz hasło
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-myway-primary/20 focus:border-myway-primary transition-all"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
                 <p className="text-rose-600 text-sm font-medium text-center">{error}</p>
@@ -94,19 +153,43 @@ export function LoginPage() {
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Logowanie...
+                  {isRegister ? 'Rejestracja...' : 'Logowanie...'}
                 </>
               ) : (
                 <>
-                  Zaloguj się
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  {isRegister ? (
+                    <>
+                      <UserPlus className="w-5 h-5" />
+                      Zarejestruj się
+                    </>
+                  ) : (
+                    <>
+                      Zaloguj się
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
                 </>
               )}
             </button>
           </form>
 
+          {/* Toggle mode */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="text-sm text-slate-500 hover:text-myway-primary transition-colors"
+            >
+              {isRegister ? (
+                <>Masz już konto? <span className="font-semibold text-myway-primary">Zaloguj się</span></>
+              ) : (
+                <>Nie masz konta? <span className="font-semibold text-myway-primary">Zarejestruj się</span></>
+              )}
+            </button>
+          </div>
+
           {/* Footer */}
-          <p className="mt-8 text-center text-sm text-slate-400">
+          <p className="mt-6 text-center text-sm text-slate-400">
             Problemy z logowaniem? Skontaktuj się z administratorem
           </p>
         </div>
