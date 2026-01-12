@@ -83,11 +83,13 @@ export const initializeDefaultAvailability = async (therapistId: string, therapi
 };
 
 // Check if a specific time slot is available for a therapist
+// Slot is available if its START time falls within the availability window
+// E.g., availability 08:00-13:00 means slots 08:00, 08:30, ..., 12:30, 13:00 are available
 export const isTimeSlotAvailable = (
   availability: Availability[],
   dayOfWeek: number,
   startTime: string,
-  endTime: string
+  _endTime: string
 ): boolean => {
   const activeAvailability = availability.filter(a => a.isActive && a.dayOfWeek === dayOfWeek);
 
@@ -100,13 +102,12 @@ export const isTimeSlotAvailable = (
   };
 
   const requestedStart = toMinutes(startTime);
-  const requestedEnd = toMinutes(endTime);
 
-  // Check if requested slot falls within any availability window
+  // Check if requested slot START falls within any availability window (inclusive)
   return activeAvailability.some(a => {
     const availStart = toMinutes(a.startTime);
     const availEnd = toMinutes(a.endTime);
-    return requestedStart >= availStart && requestedEnd <= availEnd;
+    return requestedStart >= availStart && requestedStart <= availEnd;
   });
 };
 
