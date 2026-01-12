@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getTherapists, addTherapist, deleteTherapist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getAvailabilityByTherapist, addAvailability, deleteAvailability, updateAvailability, DAY_NAMES } from '../services/availabilityService';
 import { Therapist, Availability } from '../types';
-import { Plus, Clock, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Plus, Clock, Trash2, Check, X } from 'lucide-react';
 
 interface TherapistWithAvailability extends Therapist {
     availability: Availability[];
@@ -11,7 +11,6 @@ interface TherapistWithAvailability extends Therapist {
 export function TherapistsPage() {
     const [therapists, setTherapists] = useState<TherapistWithAvailability[]>([]);
     const [loading, setLoading] = useState(true);
-    const [editingAvailability, setEditingAvailability] = useState<string | null>(null);
     const [newAvailability, setNewAvailability] = useState<{
         therapistId: string;
         dayOfWeek: number;
@@ -85,10 +84,6 @@ export function TherapistsPage() {
     const handleToggleAvailability = async (availability: Availability) => {
         await updateAvailability(availability.id, { isActive: !availability.isActive });
         loadTherapists();
-    };
-
-    const formatAvailability = (avail: Availability) => {
-        return `${DAY_NAMES[avail.dayOfWeek]} ${avail.startTime}-${avail.endTime}`;
     };
 
     if (loading) {
