@@ -102,6 +102,6 @@ export const DEFAULT_SESSIONS_PACKAGE = 20;
 // Working hours
 export const WORKING_HOURS = {
   start: 8, // 8:00
-  end: 20, // 20:00
-  slotDuration: 60, // minutes
+  end: 21, // 21:00
+  slotDuration: 30, // minutes - co pół godziny
 };

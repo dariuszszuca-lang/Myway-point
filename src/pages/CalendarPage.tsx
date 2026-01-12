@@ -13,23 +13,33 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession } from '../services/sessionService';
-import { getTherapists, getTherapistColor, ensureTherapistsExist } from '../services/therapistService';
+import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailable } from '../services/availabilityService';
 import { Session, Therapist, Patient, Availability, WORKING_HOURS, CreateSessionData } from '../types';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
 
-// Generate time slots
+// Generate time slots (every 30 minutes)
 const generateTimeSlots = () => {
   const slots: string[] = [];
   for (let hour = WORKING_HOURS.start; hour < WORKING_HOURS.end; hour++) {
     slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    slots.push(`${hour.toString().padStart(2, '0')}:30`);
   }
   return slots;
 };
 
 const TIME_SLOTS = generateTimeSlots();
+
+// Helper to add minutes to time string
+const addMinutesToTime = (time: string, minutes: number): string => {
+  const [h, m] = time.split(':').map(Number);
+  const totalMinutes = h * 60 + m + minutes;
+  const newH = Math.floor(totalMinutes / 60);
+  const newM = totalMinutes % 60;
+  return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
+};
 
 export function CalendarPage() {
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
@@ -65,6 +75,8 @@ export function CalendarPage() {
     try {
       // Ensure default therapists exist
       await ensureTherapistsExist();
+      // Ensure availability exists for all therapists
+      await initializeAvailabilityForExistingTherapists();
 
       const [sessionsData, therapistsData, patientsData, availabilityData] = await Promise.all([
         getSessionsByDateRange(weekStart, weekEnd),
@@ -100,11 +112,10 @@ export function CalendarPage() {
 
   // Check if a therapist is available at a given time slot
   // dayOfWeek: 0 = Sunday, 1 = Monday, etc. (JS Date.getDay() format)
-  // But we display Mon-Sun, so we need to convert
   const isTherapistAvailable = (date: Date, time: string, therapistId: string): boolean => {
     const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
     const therapistAvailability = availability.filter(a => a.therapistId === therapistId);
-    const endTime = `${(parseInt(time.split(':')[0]) + 1).toString().padStart(2, '0')}:00`;
+    const endTime = addMinutesToTime(time, WORKING_HOURS.slotDuration);
     return isTimeSlotAvailable(therapistAvailability, dayOfWeek, time, endTime);
   };
 
@@ -131,7 +142,7 @@ export function CalendarPage() {
     setNewSessionData({
       date: format(date, 'yyyy-MM-dd'),
       startTime: time,
-      endTime: `${(parseInt(time.split(':')[0]) + 1).toString().padStart(2, '0')}:00`,
+      endTime: addMinutesToTime(time, WORKING_HOURS.slotDuration),
       therapistId: defaultTherapist?.id,
       therapistName: defaultTherapist?.name,
     });
