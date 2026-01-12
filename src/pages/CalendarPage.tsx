@@ -15,7 +15,8 @@ import {
 import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist } from '../services/therapistService';
 import { getPatients } from '../services/patientService';
-import { Session, Therapist, Patient, WORKING_HOURS, CreateSessionData } from '../types';
+import { getAvailability, isTimeSlotAvailable } from '../services/availabilityService';
+import { Session, Therapist, Patient, Availability, WORKING_HOURS, CreateSessionData } from '../types';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
 
@@ -37,6 +38,7 @@ export function CalendarPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [availability, setAvailability] = useState<Availability[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTherapist, setSelectedTherapist] = useState<string | 'all'>('all');
 
@@ -64,14 +66,16 @@ export function CalendarPage() {
       // Ensure default therapists exist
       await ensureTherapistsExist();
 
-      const [sessionsData, therapistsData, patientsData] = await Promise.all([
+      const [sessionsData, therapistsData, patientsData, availabilityData] = await Promise.all([
         getSessionsByDateRange(weekStart, weekEnd),
         getTherapists(),
         getPatients(),
+        getAvailability(),
       ]);
       setSessions(sessionsData);
       setTherapists(therapistsData);
       setPatients(patientsData);
+      setAvailability(availabilityData);
     } catch (error) {
       console.error('Error loading calendar data:', error);
     }
@@ -94,17 +98,42 @@ export function CalendarPage() {
     });
   };
 
+  // Check if a therapist is available at a given time slot
+  // dayOfWeek: 0 = Sunday, 1 = Monday, etc. (JS Date.getDay() format)
+  // But we display Mon-Sun, so we need to convert
+  const isTherapistAvailable = (date: Date, time: string, therapistId: string): boolean => {
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const therapistAvailability = availability.filter(a => a.therapistId === therapistId);
+    const endTime = `${(parseInt(time.split(':')[0]) + 1).toString().padStart(2, '0')}:00`;
+    return isTimeSlotAvailable(therapistAvailability, dayOfWeek, time, endTime);
+  };
+
+  // Check if any therapist is available at a given time slot
+  const isAnyTherapistAvailable = (date: Date, time: string): boolean => {
+    return therapists.some(t => isTherapistAvailable(date, time, t.id));
+  };
+
+  // Get available therapists for a specific slot
+  const getAvailableTherapists = (date: Date, time: string): Therapist[] => {
+    return therapists.filter(t => isTherapistAvailable(date, time, t.id));
+  };
+
   const openNewSessionModal = (date: Date, time: string, therapistId?: string) => {
     setModalMode('create');
     setSelectedSession(null);
+
+    // Get available therapists for this slot
+    const availableTherapists = getAvailableTherapists(date, time);
+    const defaultTherapist = therapistId
+      ? therapists.find(t => t.id === therapistId)
+      : availableTherapists[0];
+
     setNewSessionData({
       date: format(date, 'yyyy-MM-dd'),
       startTime: time,
       endTime: `${(parseInt(time.split(':')[0]) + 1).toString().padStart(2, '0')}:00`,
-      therapistId: therapistId || therapists[0]?.id,
-      therapistName: therapistId
-        ? therapists.find(t => t.id === therapistId)?.name
-        : therapists[0]?.name,
+      therapistId: defaultTherapist?.id,
+      therapistName: defaultTherapist?.name,
     });
     setIsModalOpen(true);
   };
@@ -289,12 +318,17 @@ export function CalendarPage() {
                   const isToday = isSameDay(day, new Date());
                   const slotSessions = getSessionsForSlot(day, time);
 
+                  // Check availability based on selected therapist
+                  const isAvailable = selectedTherapist !== 'all'
+                    ? isTherapistAvailable(day, time, selectedTherapist)
+                    : isAnyTherapistAvailable(day, time);
+
                   return (
                     <div
                       key={dayIdx}
                       className={`p-1 border-r border-slate-100 last:border-r-0 min-h-[60px] relative group ${
                         isToday ? 'bg-myway-primary/5' : ''
-                      }`}
+                      } ${!isAvailable && slotSessions.length === 0 ? 'bg-slate-50/50' : ''}`}
                     >
                       {slotSessions.length > 0 ? (
                         <div className="space-y-1">
@@ -313,7 +347,7 @@ export function CalendarPage() {
                             );
                           })}
                         </div>
-                      ) : (
+                      ) : isAvailable ? (
                         <button
                           onClick={() => openNewSessionModal(day, time, selectedTherapist !== 'all' ? selectedTherapist : undefined)}
                           className={`absolute inset-1 flex items-center justify-center rounded-lg transition-all border-2 border-dashed ${
@@ -329,6 +363,10 @@ export function CalendarPage() {
                             </span>
                           </div>
                         </button>
+                      ) : (
+                        <div className="absolute inset-1 flex items-center justify-center">
+                          <span className="text-[10px] text-slate-300">—</span>
+                        </div>
                       )}
                     </div>
                   );
@@ -390,9 +428,9 @@ export function CalendarPage() {
                   </div>
 
                   {/* Therapist select - only if "all" view */}
-                  {selectedTherapist === 'all' && (
+                  {selectedTherapist === 'all' && newSessionData.date && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Terapeuta</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Terapeuta (dostępni w tym terminie)</label>
                       <select
                         value={newSessionData.therapistId || ''}
                         onChange={(e) => {
@@ -405,7 +443,7 @@ export function CalendarPage() {
                         }}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
                       >
-                        {therapists.map(t => (
+                        {getAvailableTherapists(parseISO(newSessionData.date), newSessionData.startTime || '09:00').map(t => (
                           <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
                       </select>

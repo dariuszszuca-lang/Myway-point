@@ -1,6 +1,7 @@
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { Therapist, DEFAULT_THERAPISTS } from '../types';
+import { initializeDefaultAvailability, deleteAvailabilityByTherapist, getAvailabilityByTherapist } from './availabilityService';
 
 const therapistsCollectionRef = collection(db, 'therapists');
 
@@ -20,7 +21,9 @@ export const getTherapists = async (): Promise<Therapist[]> => {
 
 export const initializeDefaultTherapists = async (): Promise<void> => {
   for (const therapist of DEFAULT_THERAPISTS) {
-    await addDoc(therapistsCollectionRef, therapist);
+    const docRef = await addDoc(therapistsCollectionRef, therapist);
+    // Initialize default availability for this therapist
+    await initializeDefaultAvailability(docRef.id, therapist.name);
   }
 };
 
@@ -62,6 +65,8 @@ export const updateTherapist = async (id: string, therapistData: Partial<Therapi
 };
 
 export const deleteTherapist = async (id: string): Promise<void> => {
+  // Delete therapist's availability first
+  await deleteAvailabilityByTherapist(id);
   const therapistDoc = doc(db, 'therapists', id);
   await deleteDoc(therapistDoc);
 };
@@ -78,3 +83,17 @@ export const THERAPIST_COLORS = [
 export const getTherapistColor = (index: number) => {
   return THERAPIST_COLORS[index % THERAPIST_COLORS.length];
 };
+
+// Initialize availability for existing therapists (one-time setup)
+export const initializeAvailabilityForExistingTherapists = async (): Promise<void> => {
+  const therapists = await getTherapists();
+  for (const therapist of therapists) {
+    const existingAvailability = await getAvailabilityByTherapist(therapist.id);
+    if (existingAvailability.length === 0) {
+      await initializeDefaultAvailability(therapist.id, therapist.name);
+    }
+  }
+};
+
+// Re-export availability functions for convenience
+export { getAvailabilityByTherapist } from './availabilityService';
