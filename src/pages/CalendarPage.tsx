@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
-import { getPatients } from '../services/patientService';
+import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailable } from '../services/availabilityService';
 import { Session, Therapist, Patient, Availability, WORKING_HOURS, CreateSessionData } from '../types';
 
@@ -171,9 +171,25 @@ export function CalendarPage() {
     }
   };
 
-  const handleStatusChange = async (sessionId: string, status: Session['status']) => {
+  const handleStatusChange = async (sessionId: string, newStatus: Session['status']) => {
     try {
-      await updateSessionStatus(sessionId, status);
+      const previousStatus = selectedSession?.status;
+      const patientId = selectedSession?.patientId;
+
+      await updateSessionStatus(sessionId, newStatus);
+
+      // Update usedSessions count
+      if (patientId) {
+        // If changing TO completed (and wasn't completed before)
+        if (newStatus === 'completed' && previousStatus !== 'completed') {
+          await incrementUsedSessions(patientId);
+        }
+        // If changing FROM completed to something else
+        else if (previousStatus === 'completed' && newStatus !== 'completed') {
+          await decrementUsedSessions(patientId);
+        }
+      }
+
       loadData();
       setIsModalOpen(false);
     } catch (error) {
