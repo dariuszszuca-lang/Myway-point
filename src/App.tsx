@@ -13,7 +13,8 @@ import {
   Bell,
   Search,
   Activity,
-  LogOut
+  LogOut,
+  User
 } from 'lucide-react';
 import { signOut, getAuth } from 'firebase/auth';
 
@@ -26,6 +27,15 @@ function ProtectedRoute() {
   return <MainLayout />;
 }
 
+// --- Admin Only Route ---
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAdmin } = useAuth();
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -36,7 +46,14 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="patients" element={<PatientsPage />} />
-            <Route path="settings" element={<TherapistsPage />} />
+            <Route
+              path="settings"
+              element={
+                <AdminRoute>
+                  <TherapistsPage />
+                </AdminRoute>
+              }
+            />
           </Route>
         </Routes>
       </Router>
@@ -46,6 +63,8 @@ export default function App() {
 
 // --- Main Application Layout ---
 function MainLayout() {
+  const { isAdmin, patientData, user } = useAuth();
+
   return (
     <div className="min-h-screen bg-myway-bg flex font-sans text-myway-text">
       <aside className="w-20 lg:w-72 bg-white border-r border-slate-200 flex flex-col transition-all duration-300">
@@ -67,18 +86,62 @@ function MainLayout() {
             label="Kalendarz"
             to="/calendar"
           />
-          <NavItem
-            icon={<Users size={22} />}
-            label="Pacjenci"
-            to="/patients"
-          />
-          <div className="pt-4 mt-4 border-t border-slate-100">
+
+          {/* Patients page - admin sees all, patient sees only their sessions */}
+          {isAdmin && (
             <NavItem
-              icon={<Settings size={22} />}
-              label="Ustawienia"
-              to="/settings"
+              icon={<Users size={22} />}
+              label="Pacjenci"
+              to="/patients"
             />
-          </div>
+          )}
+
+          {/* Settings - admin only */}
+          {isAdmin && (
+            <div className="pt-4 mt-4 border-t border-slate-100">
+              <NavItem
+                icon={<Settings size={22} />}
+                label="Ustawienia"
+                to="/settings"
+              />
+            </div>
+          )}
+
+          {/* Patient info panel */}
+          {!isAdmin && patientData && (
+            <div className="pt-4 mt-4 border-t border-slate-100">
+              <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl p-4 border border-teal-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
+                    <User size={18} className="text-white" />
+                  </div>
+                  <div className="hidden lg:block">
+                    <p className="font-semibold text-slate-700 text-sm">{patientData.name}</p>
+                    <p className="text-xs text-slate-500">Pacjent</p>
+                  </div>
+                </div>
+                <div className="hidden lg:block">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Pozostało sesji:</span>
+                    <span className="font-bold text-teal-700">
+                      {patientData.totalSessions - patientData.usedSessions}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${((patientData.totalSessions - patientData.usedSessions) / patientData.totalSessions) * 100}%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 text-center">
+                    {patientData.usedSessions} z {patientData.totalSessions} wykorzystanych
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </nav>
 
         <div className="p-4 border-t border-slate-100">
@@ -94,20 +157,31 @@ function MainLayout() {
 
       <main className="flex-1 overflow-y-auto flex flex-col">
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-8 flex justify-between items-center">
-          <div />
+          <div className="flex items-center gap-2">
+            {!isAdmin && (
+              <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-medium">
+                Konto pacjenta
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-4">
-            <div className="relative hidden md:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Szukaj pacjenta..."
-                className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-myway-primary/20 w-64 transition-all"
-              />
-            </div>
+            {isAdmin && (
+              <div className="relative hidden md:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Szukaj pacjenta..."
+                  className="pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-myway-primary/20 w-64 transition-all"
+                />
+              </div>
+            )}
             <button className="relative p-2.5 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
               <Bell size={20} />
               <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
             </button>
+            <div className="hidden md:flex items-center gap-2 text-sm text-slate-600">
+              <span>{user?.email}</span>
+            </div>
           </div>
         </header>
 

@@ -15,7 +15,7 @@ async function sendEmailWithResend(to, subject, html, text) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "MyWay Point <onboarding@resend.dev>",
+      from: "MyWay Point <rezerwacje@osrodek-myway.pl>",
       to: [to],
       subject: subject,
       html: html,
@@ -175,5 +175,108 @@ MyWay Point
     } catch (error) {
       console.error("Błąd:", error);
       throw new functions.https.HttpsError("internal", error.message);
+    }
+  });
+
+// =======================================================================
+// INTEGRACJA MyWay-CRM -> MyWayPoint-Rezerwacje
+// Endpoint wywoływany przez MyWay-CRM gdy dodawany jest pacjent z Pakietem 3
+// =======================================================================
+
+exports.createPatientFromCRM = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    // CORS headers
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    // Handle preflight
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    // Only accept POST
+    if (req.method !== "POST") {
+      res.status(405).json({ success: false, error: "Method not allowed" });
+      return;
+    }
+
+    try {
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        totalSessions,
+        crmPatientId,
+      } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !email) {
+        res.status(400).json({
+          success: false,
+          error: "Missing required fields: firstName, lastName, email",
+        });
+        return;
+      }
+
+      // Check if patient with this email already exists
+      const existingPatient = await admin
+        .firestore()
+        .collection("patients")
+        .where("email", "==", email.toLowerCase())
+        .get();
+
+      if (!existingPatient.empty) {
+        // Patient exists - update with CRM link
+        const existingDoc = existingPatient.docs[0];
+        await existingDoc.ref.update({
+          crmPatientId: crmPatientId || null,
+          totalSessions: totalSessions || 20,
+          updatedAt: Date.now(),
+        });
+
+        console.log("Patient updated from CRM:", existingDoc.id);
+        res.status(200).json({
+          success: true,
+          patientId: existingDoc.id,
+          message: "Patient updated",
+        });
+        return;
+      }
+
+      // Create new patient
+      const patientData = {
+        name: `${firstName} ${lastName}`,
+        email: email.toLowerCase(),
+        phone: phone || "",
+        totalSessions: totalSessions || 20,
+        usedSessions: 0,
+        sessionsHistory: [],
+        notes: `Zaimportowany z MyWay CRM`,
+        crmPatientId: crmPatientId || null,
+        createdAt: Date.now(),
+      };
+
+      const docRef = await admin
+        .firestore()
+        .collection("patients")
+        .add(patientData);
+
+      console.log("New patient created from CRM:", docRef.id, patientData);
+
+      res.status(201).json({
+        success: true,
+        patientId: docRef.id,
+        message: "Patient created",
+      });
+    } catch (error) {
+      console.error("Error creating patient from CRM:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
     }
   });

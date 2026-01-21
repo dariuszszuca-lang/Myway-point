@@ -161,6 +161,16 @@ export function CalendarPage() {
       return;
     }
 
+    // Check if patient has remaining sessions
+    const selectedPatient = patients.find(p => p.id === newSessionData.patientId);
+    if (selectedPatient) {
+      const remainingSessions = selectedPatient.totalSessions - selectedPatient.usedSessions;
+      if (remainingSessions <= 0) {
+        alert('Ten pacjent wykorzystał już wszystkie dostępne sesje. Nie można utworzyć nowej rezerwacji.');
+        return;
+      }
+    }
+
     try {
       await createSession(newSessionData as CreateSessionData);
       setIsModalOpen(false);
@@ -496,8 +506,8 @@ export function CalendarPage() {
                       {patients.map(p => {
                         const remaining = p.totalSessions - p.usedSessions;
                         return (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({remaining} sesji pozostało)
+                          <option key={p.id} value={p.id} disabled={remaining <= 0}>
+                            {p.name} ({remaining} sesji pozostało){remaining <= 0 ? ' - BRAK SESJI' : ''}
                           </option>
                         );
                       })}
@@ -507,6 +517,33 @@ export function CalendarPage() {
                         Brak pacjentów. Dodaj pacjenta w zakładce "Pacjenci".
                       </p>
                     )}
+                    {/* Warning for selected patient with low sessions */}
+                    {newSessionData.patientId && (() => {
+                      const selectedPatient = patients.find(p => p.id === newSessionData.patientId);
+                      if (selectedPatient) {
+                        const remaining = selectedPatient.totalSessions - selectedPatient.usedSessions;
+                        if (remaining === 0) {
+                          return (
+                            <div className="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2">
+                              <AlertCircle size={16} className="text-rose-600" />
+                              <p className="text-xs text-rose-700 font-medium">
+                                Ten pacjent wykorzystał wszystkie sesje. Rezerwacja niemożliwa.
+                              </p>
+                            </div>
+                          );
+                        } else if (remaining <= 3) {
+                          return (
+                            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                              <AlertCircle size={16} className="text-amber-600" />
+                              <p className="text-xs text-amber-700">
+                                Uwaga: Pacjent ma tylko {remaining} {remaining === 1 ? 'sesję' : 'sesje'} pozostałe.
+                              </p>
+                            </div>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   {/* Notes */}

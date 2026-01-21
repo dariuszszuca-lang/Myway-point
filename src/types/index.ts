@@ -16,6 +16,7 @@ export interface Patient {
   sessionsHistory: string[]; // Session IDs
   notes?: string;
   createdAt: number;
+  crmPatientId?: string; // Link to MyWay-CRM patient record
 }
 
 export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
