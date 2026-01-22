@@ -67,7 +67,8 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
         resource.data.patientId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patientId &&
         request.resource.data.status == 'cancelled' &&
-        resource.data.status == 'scheduled';
+        resource.data.status == 'scheduled' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
     }
   }
 }
