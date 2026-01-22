@@ -736,12 +736,23 @@ export function CalendarPage() {
                 </>
               ) : selectedSession && (
                 <>
-                  {isAdmin && (
+                  {isAdmin ? (
                     <button
                       onClick={() => handleDeleteSession(selectedSession.id)}
                       className="flex-1 py-3 px-4 bg-rose-50 text-rose-600 rounded-xl font-medium hover:bg-rose-100 transition-colors"
                     >
                       Usuń
+                    </button>
+                  ) : selectedSession.status === 'scheduled' && (
+                    <button
+                      onClick={() => {
+                        if (confirm('Czy na pewno chcesz odwołać tę wizytę?')) {
+                          handleStatusChange(selectedSession.id, 'cancelled');
+                        }
+                      }}
+                      className="flex-1 py-3 px-4 bg-rose-50 text-rose-600 rounded-xl font-medium hover:bg-rose-100 transition-colors"
+                    >
+                      Odwołaj wizytę
                     </button>
                   )}
                   <button
