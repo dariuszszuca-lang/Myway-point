@@ -39,8 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (firebaseUser && firebaseUser.email) {
         try {
-          // Ensure user document exists and get role
-          const userData = await ensureUserExists(firebaseUser.uid, firebaseUser.email);
+          // Ensure user document exists and get role (pass displayName from Firebase Auth)
+          const userData = await ensureUserExists(
+            firebaseUser.uid,
+            firebaseUser.email,
+            firebaseUser.displayName
+          );
           setAppUser(userData);
 
           // If patient, load patient data

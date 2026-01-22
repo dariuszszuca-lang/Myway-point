@@ -7,6 +7,7 @@ export type UserRole = 'admin' | 'patient';
 export interface AppUser {
   uid: string;
   email: string;
+  displayName: string | null;
   role: UserRole;
   patientId: string | null;
   createdAt: number;
@@ -60,14 +61,22 @@ export const findPatientByEmail = async (email: string): Promise<Patient | null>
  * Create or update user document on login
  * - Auto-assigns admin role for admin emails
  * - Links patient account if email matches a patient
+ * - Stores displayName for session booking
  */
-export const ensureUserExists = async (uid: string, email: string): Promise<AppUser> => {
+export const ensureUserExists = async (uid: string, email: string, displayName?: string | null): Promise<AppUser> => {
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
 
   if (userSnap.exists()) {
-    // User exists, return existing data
-    return { uid, ...userSnap.data() } as AppUser;
+    const existingUser = { uid, ...userSnap.data() } as AppUser;
+
+    // Update displayName if it changed (e.g., user updated profile)
+    if (displayName && displayName !== existingUser.displayName) {
+      await setDoc(userRef, { displayName }, { merge: true });
+      existingUser.displayName = displayName;
+    }
+
+    return existingUser;
   }
 
   // New user - determine role
@@ -85,6 +94,7 @@ export const ensureUserExists = async (uid: string, email: string): Promise<AppU
   // Create user document
   const newUser: Omit<AppUser, 'uid'> = {
     email: email.toLowerCase(),
+    displayName: displayName || null,
     role,
     patientId,
     createdAt: Date.now()

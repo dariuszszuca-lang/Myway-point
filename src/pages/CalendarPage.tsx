@@ -43,7 +43,7 @@ const addMinutesToTime = (time: string, minutes: number): string => {
 };
 
 export function CalendarPage() {
-  const { isAdmin, patientData } = useAuth();
+  const { isAdmin, patientData, appUser } = useAuth();
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -615,13 +615,23 @@ export function CalendarPage() {
                         </>
                       ) : (
                         <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                          <div className="flex items-center gap-2 text-amber-700">
-                            <AlertCircle size={18} />
-                            <p className="text-sm font-medium">Twoje konto nie jest jeszcze aktywowane</p>
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
+                              <User size={18} className="text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-700">
+                                {appUser?.displayName || 'Nieznany użytkownik'}
+                              </p>
+                              <p className="text-xs text-amber-600">Konto nieaktywne</p>
+                            </div>
                           </div>
-                          <p className="text-xs text-amber-600 mt-2">
-                            Skontaktuj się z ośrodkiem MyWay, aby aktywować dostęp do rezerwacji.
-                          </p>
+                          <div className="flex items-center gap-2 text-amber-700 bg-amber-100 p-2 rounded-lg">
+                            <AlertCircle size={16} />
+                            <p className="text-xs font-medium">
+                              Skontaktuj się z ośrodkiem MyWay, aby aktywować dostęp do rezerwacji.
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>

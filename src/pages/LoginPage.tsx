@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus, CheckCircle } from 'lucide-react';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus, CheckCircle, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export function LoginPage() {
@@ -9,6 +9,8 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,12 @@ export function LoginPage() {
     setSuccess('');
 
     if (isRegister) {
-      // Rejestracja
+      // Rejestracja - walidacja
+      if (!firstName.trim() || !lastName.trim()) {
+        setError('Podaj imię i nazwisko');
+        setLoading(false);
+        return;
+      }
       if (password !== confirmPassword) {
         setError('Hasła nie są identyczne');
         setLoading(false);
@@ -39,7 +46,11 @@ export function LoginPage() {
         return;
       }
       try {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Ustaw displayName (imię i nazwisko)
+        await updateProfile(userCredential.user, {
+          displayName: `${firstName.trim()} ${lastName.trim()}`
+        });
         setSuccess('Konto utworzone! Przekierowuję do panelu...');
         // Przekierowanie nastąpi automatycznie przez sprawdzenie user w useAuth
       } catch (err: any) {
@@ -69,6 +80,8 @@ export function LoginPage() {
     setError('');
     setSuccess('');
     setConfirmPassword('');
+    setFirstName('');
+    setLastName('');
   };
 
   return (
@@ -99,6 +112,41 @@ export function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Imię i Nazwisko - tylko przy rejestracji */}
+            {isRegister && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Imię
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Jan"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-myway-primary/20 focus:border-myway-primary transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Nazwisko
+                  </label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Kowalski"
+                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-myway-primary/20 focus:border-myway-primary transition-all"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Adres e-mail
