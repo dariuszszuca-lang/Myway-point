@@ -691,26 +691,28 @@ export function CalendarPage() {
                     </div>
                   </div>
 
-                  {/* Status actions */}
-                  <div className="pt-4 border-t border-slate-100">
-                    <p className="text-sm font-medium text-slate-700 mb-3">Zmień status:</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => handleStatusChange(selectedSession.id, 'completed')}
-                        className="flex items-center justify-center gap-2 p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
-                      >
-                        <Check size={16} />
-                        Zakończona
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(selectedSession.id, 'no-show')}
-                        className="flex items-center justify-center gap-2 p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors"
-                      >
-                        <AlertCircle size={16} />
-                        Nieobecność
-                      </button>
+                  {/* Status actions - only for admin */}
+                  {isAdmin && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <p className="text-sm font-medium text-slate-700 mb-3">Zmień status:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleStatusChange(selectedSession.id, 'completed')}
+                          className="flex items-center justify-center gap-2 p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                        >
+                          <Check size={16} />
+                          Zakończona
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(selectedSession.id, 'no-show')}
+                          className="flex items-center justify-center gap-2 p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors"
+                        >
+                          <AlertCircle size={16} />
+                          Nieobecność
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
             </div>
@@ -734,12 +736,14 @@ export function CalendarPage() {
                 </>
               ) : selectedSession && (
                 <>
-                  <button
-                    onClick={() => handleDeleteSession(selectedSession.id)}
-                    className="flex-1 py-3 px-4 bg-rose-50 text-rose-600 rounded-xl font-medium hover:bg-rose-100 transition-colors"
-                  >
-                    Usuń
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDeleteSession(selectedSession.id)}
+                      className="flex-1 py-3 px-4 bg-rose-50 text-rose-600 rounded-xl font-medium hover:bg-rose-100 transition-colors"
+                    >
+                      Usuń
+                    </button>
+                  )}
                   <button
                     onClick={() => setIsModalOpen(false)}
                     className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors"
