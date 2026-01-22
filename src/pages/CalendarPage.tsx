@@ -76,17 +76,34 @@ export function CalendarPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Ensure default therapists exist
-      await ensureTherapistsExist();
-      // Ensure availability exists for all therapists
-      await initializeAvailabilityForExistingTherapists();
+      // Admin-only: ensure default therapists and availability exist
+      if (isAdmin) {
+        await ensureTherapistsExist();
+        await initializeAvailabilityForExistingTherapists();
+      }
 
-      const [sessionsData, therapistsData, patientsData, availabilityData] = await Promise.all([
-        getSessionsByDateRange(weekStart, weekEnd),
+      // Load data - different queries for admin vs patient
+      const [therapistsData, availabilityData] = await Promise.all([
         getTherapists(),
-        getPatients(),
         getAvailability(),
       ]);
+
+      // Sessions and patients - admin gets all, patient gets filtered
+      let sessionsData: Session[] = [];
+      let patientsData: Patient[] = [];
+
+      if (isAdmin) {
+        [sessionsData, patientsData] = await Promise.all([
+          getSessionsByDateRange(weekStart, weekEnd),
+          getPatients(),
+        ]);
+      } else if (patientData) {
+        // Patient sees only their own sessions
+        sessionsData = (await getSessionsByDateRange(weekStart, weekEnd))
+          .filter(s => s.patientId === patientData.id);
+        patientsData = [patientData]; // Only themselves
+      }
+
       setSessions(sessionsData);
       setTherapists(therapistsData);
       setPatients(patientsData);

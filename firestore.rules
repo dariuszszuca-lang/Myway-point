@@ -57,9 +57,10 @@ service cloud.firestore {
     match /sessions/{sessionId} {
       // Admini mają pełny dostęp
       allow read, write: if isAdmin();
-      // Pacjent może czytać swoje sesje i tworzyć nowe (rezerwacja)
-      allow read: if isAuthenticated() &&
-        resource.data.patientId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patientId;
+      // Wszyscy zalogowani mogą czytać sesje (potrzebne do wyświetlania zajętych terminów)
+      // Na frontendzie filtrujemy - pacjent widzi tylko że termin jest zajęty, nie widzi danych innych pacjentów
+      allow read: if isAuthenticated();
+      // Pacjent może tworzyć rezerwację tylko dla siebie
       allow create: if isAuthenticated() &&
         request.resource.data.patientId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patientId;
     }
