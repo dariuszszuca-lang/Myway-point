@@ -17,6 +17,7 @@ import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvai
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailable } from '../services/availabilityService';
 import { Session, Therapist, Patient, Availability, WORKING_HOURS, CreateSessionData } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
 
@@ -42,6 +43,8 @@ const addMinutesToTime = (time: string, minutes: number): string => {
 };
 
 export function CalendarPage() {
+  const { isAdmin, patientData } = useAuth();
+
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
@@ -139,13 +142,22 @@ export function CalendarPage() {
       ? therapists.find(t => t.id === therapistId)
       : availableTherapists[0];
 
-    setNewSessionData({
+    // For patients - auto-fill their data
+    const sessionData: Partial<CreateSessionData> = {
       date: format(date, 'yyyy-MM-dd'),
       startTime: time,
       endTime: addMinutesToTime(time, WORKING_HOURS.slotDuration),
       therapistId: defaultTherapist?.id,
       therapistName: defaultTherapist?.name,
-    });
+    };
+
+    // If patient is logged in, auto-assign their data
+    if (!isAdmin && patientData) {
+      sessionData.patientId = patientData.id;
+      sessionData.patientName = patientData.name;
+    }
+
+    setNewSessionData(sessionData);
     setIsModalOpen(true);
   };
 
@@ -156,17 +168,29 @@ export function CalendarPage() {
   };
 
   const handleCreateSession = async () => {
+    // For patients without active account - block reservation
+    if (!isAdmin && !patientData) {
+      alert('Twoje konto nie jest jeszcze aktywowane. Skontaktuj się z ośrodkiem MyWay.');
+      return;
+    }
+
     if (!newSessionData.patientId || !newSessionData.therapistId || !newSessionData.date) {
       alert('Wypełnij wszystkie pola');
       return;
     }
 
     // Check if patient has remaining sessions
-    const selectedPatient = patients.find(p => p.id === newSessionData.patientId);
-    if (selectedPatient) {
-      const remainingSessions = selectedPatient.totalSessions - selectedPatient.usedSessions;
+    const checkPatient = isAdmin
+      ? patients.find(p => p.id === newSessionData.patientId)
+      : patientData;
+
+    if (checkPatient) {
+      const remainingSessions = checkPatient.totalSessions - checkPatient.usedSessions;
       if (remainingSessions <= 0) {
-        alert('Ten pacjent wykorzystał już wszystkie dostępne sesje. Nie można utworzyć nowej rezerwacji.');
+        alert(isAdmin
+          ? 'Ten pacjent wykorzystał już wszystkie dostępne sesje. Nie można utworzyć nowej rezerwacji.'
+          : 'Wykorzystałeś wszystkie dostępne sesje. Skontaktuj się z ośrodkiem MyWay.'
+        );
         return;
       }
     }
@@ -487,64 +511,121 @@ export function CalendarPage() {
                     </div>
                   )}
 
-                  {/* Patient select */}
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Wybierz pacjenta</label>
-                    <select
-                      value={newSessionData.patientId || ''}
-                      onChange={(e) => {
-                        const patient = patients.find(p => p.id === e.target.value);
-                        setNewSessionData(prev => ({
-                          ...prev,
-                          patientId: e.target.value,
-                          patientName: patient?.name,
-                        }));
-                      }}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20 text-base"
-                    >
-                      <option value="">-- Wybierz pacjenta --</option>
-                      {patients.map(p => {
-                        const remaining = p.totalSessions - p.usedSessions;
-                        return (
-                          <option key={p.id} value={p.id} disabled={remaining <= 0}>
-                            {p.name} ({remaining} sesji pozostało){remaining <= 0 ? ' - BRAK SESJI' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {patients.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-2">
-                        Brak pacjentów. Dodaj pacjenta w zakładce "Pacjenci".
-                      </p>
-                    )}
-                    {/* Warning for selected patient with low sessions */}
-                    {newSessionData.patientId && (() => {
-                      const selectedPatient = patients.find(p => p.id === newSessionData.patientId);
-                      if (selectedPatient) {
-                        const remaining = selectedPatient.totalSessions - selectedPatient.usedSessions;
-                        if (remaining === 0) {
+                  {/* Patient select - different view for admin vs patient */}
+                  {isAdmin ? (
+                    // ADMIN: pokazuje dropdown z listą pacjentów
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Wybierz pacjenta</label>
+                      <select
+                        value={newSessionData.patientId || ''}
+                        onChange={(e) => {
+                          const patient = patients.find(p => p.id === e.target.value);
+                          setNewSessionData(prev => ({
+                            ...prev,
+                            patientId: e.target.value,
+                            patientName: patient?.name,
+                          }));
+                        }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20 text-base"
+                      >
+                        <option value="">-- Wybierz pacjenta --</option>
+                        {patients.map(p => {
+                          const remaining = p.totalSessions - p.usedSessions;
                           return (
-                            <div className="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2">
-                              <AlertCircle size={16} className="text-rose-600" />
-                              <p className="text-xs text-rose-700 font-medium">
-                                Ten pacjent wykorzystał wszystkie sesje. Rezerwacja niemożliwa.
-                              </p>
-                            </div>
+                            <option key={p.id} value={p.id} disabled={remaining <= 0}>
+                              {p.name} ({remaining} sesji pozostało){remaining <= 0 ? ' - BRAK SESJI' : ''}
+                            </option>
                           );
-                        } else if (remaining <= 3) {
-                          return (
-                            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
-                              <AlertCircle size={16} className="text-amber-600" />
-                              <p className="text-xs text-amber-700">
-                                Uwaga: Pacjent ma tylko {remaining} {remaining === 1 ? 'sesję' : 'sesje'} pozostałe.
-                              </p>
-                            </div>
-                          );
+                        })}
+                      </select>
+                      {patients.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          Brak pacjentów. Dodaj pacjenta w zakładce "Pacjenci".
+                        </p>
+                      )}
+                      {/* Warning for selected patient with low sessions */}
+                      {newSessionData.patientId && (() => {
+                        const selectedPatient = patients.find(p => p.id === newSessionData.patientId);
+                        if (selectedPatient) {
+                          const remaining = selectedPatient.totalSessions - selectedPatient.usedSessions;
+                          if (remaining === 0) {
+                            return (
+                              <div className="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2">
+                                <AlertCircle size={16} className="text-rose-600" />
+                                <p className="text-xs text-rose-700 font-medium">
+                                  Ten pacjent wykorzystał wszystkie sesje. Rezerwacja niemożliwa.
+                                </p>
+                              </div>
+                            );
+                          } else if (remaining <= 3) {
+                            return (
+                              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                                <AlertCircle size={16} className="text-amber-600" />
+                                <p className="text-xs text-amber-700">
+                                  Uwaga: Pacjent ma tylko {remaining} {remaining === 1 ? 'sesję' : 'sesje'} pozostałe.
+                                </p>
+                              </div>
+                            );
+                          }
                         }
-                      }
-                      return null;
-                    })()}
-                  </div>
+                        return null;
+                      })()}
+                    </div>
+                  ) : (
+                    // PACJENT: pokazuje jego dane (bez możliwości zmiany)
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Rezerwacja dla</label>
+                      {patientData ? (
+                        <>
+                          <div className="flex items-center gap-3 p-4 bg-teal-50 rounded-xl border border-teal-200">
+                            <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
+                              <User size={18} className="text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-700">{patientData.name}</p>
+                              <p className="text-sm text-teal-700">
+                                Pozostało {patientData.totalSessions - patientData.usedSessions} z {patientData.totalSessions} sesji
+                              </p>
+                            </div>
+                          </div>
+                          {/* Warning if low/no sessions */}
+                          {(() => {
+                            const remaining = patientData.totalSessions - patientData.usedSessions;
+                            if (remaining === 0) {
+                              return (
+                                <div className="mt-2 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2">
+                                  <AlertCircle size={16} className="text-rose-600" />
+                                  <p className="text-xs text-rose-700 font-medium">
+                                    Wykorzystałeś wszystkie sesje. Skontaktuj się z ośrodkiem.
+                                  </p>
+                                </div>
+                              );
+                            } else if (remaining <= 3) {
+                              return (
+                                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                                  <AlertCircle size={16} className="text-amber-600" />
+                                  <p className="text-xs text-amber-700">
+                                    Pozostało tylko {remaining} {remaining === 1 ? 'sesja' : 'sesje'}.
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </>
+                      ) : (
+                        <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                          <div className="flex items-center gap-2 text-amber-700">
+                            <AlertCircle size={18} />
+                            <p className="text-sm font-medium">Twoje konto nie jest jeszcze aktywowane</p>
+                          </div>
+                          <p className="text-xs text-amber-600 mt-2">
+                            Skontaktuj się z ośrodkiem MyWay, aby aktywować dostęp do rezerwacji.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Notes */}
                   <div>
