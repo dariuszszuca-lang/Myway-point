@@ -229,8 +229,8 @@ export function CalendarPage() {
 
       await updateSessionStatus(sessionId, newStatus);
 
-      // Update usedSessions count
-      if (patientId) {
+      // Update usedSessions count - only admin can modify patient records
+      if (isAdmin && patientId) {
         // If changing TO completed (and wasn't completed before)
         if (newStatus === 'completed' && previousStatus !== 'completed') {
           await incrementUsedSessions(patientId);
@@ -245,6 +245,7 @@ export function CalendarPage() {
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error updating session:', error);
+      alert('Błąd podczas aktualizacji sesji');
     }
   };
 
