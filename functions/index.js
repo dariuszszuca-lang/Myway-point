@@ -183,6 +183,99 @@ MyWay Point
 // Endpoint wywoływany przez MyWay-CRM gdy dodawany jest pacjent z Pakietem 3
 // =======================================================================
 
+// =======================================================================
+// GETRESPONSE - wysyłka maila powitalnego dla nowych pacjentów
+// =======================================================================
+
+const GETRESPONSE_API_KEY = "9ax00x1rt3wdfv36xcqoshr8t50fwhtk";
+
+// Kampanie dla poszczególnych pakietów
+const CAMPAIGN_IDS = {
+  "1": "iccz2",  // 6. PAKIET 1
+  "2": "fzbxf",  // 11. PAKIET 2
+  "3": "ij5Ot",  // 2. PAKIET 3
+};
+
+exports.sendWelcomeEmailToPatient = functions
+  .region("europe-west1")
+  .https.onRequest(async (req, res) => {
+    // CORS headers
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ success: false, error: "Method not allowed" });
+      return;
+    }
+
+    try {
+      const { email, firstName, lastName, package: packageType, phone } = req.body;
+
+      if (!email || !firstName || !lastName) {
+        res.status(400).json({
+          success: false,
+          error: "Missing required fields: email, firstName, lastName",
+        });
+        return;
+      }
+
+      // Wybierz kampanię na podstawie pakietu
+      const campaignId = CAMPAIGN_IDS[packageType] || CAMPAIGN_IDS["1"];
+      console.log(`📧 Dodawanie ${email} do kampanii pakietu ${packageType} (${campaignId})`);
+
+      // Wyślij do GetResponse
+      const response = await fetch("https://api.getresponse.com/v3/contacts", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": `api-key ${GETRESPONSE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          name: `${firstName} ${lastName}`,
+          campaign: { campaignId: campaignId },
+          dayOfCycle: 0,
+          customFieldValues: [
+            { customFieldId: "naIkxY", value: [packageType || "1"] },
+            ...(phone ? [{ customFieldId: "naIF5S", value: [phone] }] : []),
+          ],
+        }),
+      });
+
+      if (response.ok || response.status === 202) {
+        console.log("✅ Pacjent dodany do GetResponse:", email, "kampania:", campaignId);
+        res.status(200).json({ success: true, message: `Contact added to package ${packageType} campaign` });
+        return;
+      }
+
+      const errorData = await response.json();
+
+      // Kontakt już istnieje
+      if (errorData.code === 1008) {
+        console.log("ℹ️ Pacjent już istnieje w GetResponse:", email);
+        res.status(200).json({ success: true, message: "Contact already exists" });
+        return;
+      }
+
+      console.error("❌ GetResponse error:", errorData);
+      res.status(400).json({ success: false, error: errorData });
+    } catch (error) {
+      console.error("❌ Error sending to GetResponse:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+// =======================================================================
+// INTEGRACJA MyWay-CRM -> MyWayPoint-Rezerwacje
+// Endpoint wywoływany przez MyWay-CRM gdy dodawany jest pacjent z Pakietem 3
+// =======================================================================
+
 exports.createPatientFromCRM = functions
   .region("europe-west1")
   .https.onRequest(async (req, res) => {

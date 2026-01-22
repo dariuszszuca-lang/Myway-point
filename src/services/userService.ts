@@ -1,5 +1,5 @@
 import { db } from '../firebaseConfig';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { Patient } from '../types';
 
 export type UserRole = 'admin' | 'patient';
@@ -82,12 +82,26 @@ export const ensureUserExists = async (uid: string, email: string, displayName?:
   // New user - determine role
   const role: UserRole = isAdminEmail(email) ? 'admin' : 'patient';
 
-  // For patients, try to find matching patient record
+  // For patients, try to find matching patient record or create new one
   let patientId: string | null = null;
   if (role === 'patient') {
     const patient = await findPatientByEmail(email);
     if (patient) {
       patientId = patient.id;
+    } else {
+      // Create new patient record automatically
+      const newPatient = {
+        name: displayName || email.split('@')[0],
+        email: email.toLowerCase(),
+        phone: '',
+        totalSessions: 0,
+        usedSessions: 0,
+        sessionsHistory: [],
+        notes: 'Zarejestrowany przez MyWayPoint',
+        createdAt: Date.now()
+      };
+      const patientDoc = await addDoc(collection(db, 'patients'), newPatient);
+      patientId = patientDoc.id;
     }
   }
 
