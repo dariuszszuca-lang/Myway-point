@@ -45,7 +45,14 @@ export default function App() {
           <Route path="/" element={<ProtectedRoute />}>
             <Route index element={<DashboardPage />} />
             <Route path="calendar" element={<CalendarPage />} />
-            <Route path="patients" element={<PatientsPage />} />
+            <Route
+              path="patients"
+              element={
+                <AdminRoute>
+                  <PatientsPage />
+                </AdminRoute>
+              }
+            />
             <Route
               path="settings"
               element={
