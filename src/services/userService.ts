@@ -17,7 +17,8 @@ export interface AppUser {
 const ADMIN_EMAILS = [
   "dariusz.szuca@gmail.com",
   "krystiannagaba@gmail.com",
-  "mywaymarcin@gmail.com"
+  "mywaymarcin@gmail.com",
+  "waldemarsikorski77@gmail.com"
 ];
 
 /**

@@ -184,17 +184,45 @@ MyWay Point
 // =======================================================================
 
 // =======================================================================
-// GETRESPONSE - wysyłka maila powitalnego dla nowych pacjentów
+// GETRESPONSE - dodawanie pacjentów do list mailingowych
+// Pacjent trafia do listy pakietu + WSZYSTKIE KONTAKTY
+// GetResponse automatycznie wysyła wiadomość powitalną (autoresponder)
 // =======================================================================
 
-const GETRESPONSE_API_KEY = "9ax00x1rt3wdfv36xcqoshr8t50fwhtk";
+const GETRESPONSE_API_KEY = "vmnpekcq9jurqcsf1ftgtht18abg4ooe";
 
 // Kampanie dla poszczególnych pakietów
 const CAMPAIGN_IDS = {
-  "1": "iccz2",  // 6. PAKIET 1
-  "2": "fzbxf",  // 11. PAKIET 2
-  "3": "ij5Ot",  // 2. PAKIET 3
+  "1": "iccz2",  // PAKIET 1
+  "2": "fzbxf",  // PAKIET 2
+  "3": "ij5Ot",  // PAKIET 3
 };
+
+// Lista główna - wszyscy pacjenci
+const ALL_CONTACTS_CAMPAIGN_ID = "Lik0s";  // WSZYSTKIE KONTAKTY
+
+/**
+ * Helper: Dodaje kontakt do GetResponse
+ */
+async function addContactToGetResponse(email, name, campaignId, packageType, phone) {
+  return await fetch("https://api.getresponse.com/v3/contacts", {
+    method: "POST",
+    headers: {
+      "X-Auth-Token": `api-key ${GETRESPONSE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: email,
+      name: name,
+      campaign: { campaignId: campaignId },
+      dayOfCycle: 0,
+      customFieldValues: [
+        { customFieldId: "naIkxY", value: [packageType || "1"] },
+        ...(phone ? [{ customFieldId: "naIF5S", value: [phone] }] : []),
+      ],
+    }),
+  });
+}
 
 exports.sendWelcomeEmailToPatient = functions
   .region("europe-west1")
@@ -225,48 +253,61 @@ exports.sendWelcomeEmailToPatient = functions
         return;
       }
 
-      // Wybierz kampanię na podstawie pakietu
+      const fullName = `${firstName} ${lastName}`;
       const campaignId = CAMPAIGN_IDS[packageType] || CAMPAIGN_IDS["1"];
-      console.log(`📧 Dodawanie ${email} do kampanii pakietu ${packageType} (${campaignId})`);
 
-      // Wyślij do GetResponse
-      const response = await fetch("https://api.getresponse.com/v3/contacts", {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": `api-key ${GETRESPONSE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email,
-          name: `${firstName} ${lastName}`,
-          campaign: { campaignId: campaignId },
-          dayOfCycle: 0,
-          customFieldValues: [
-            { customFieldId: "naIkxY", value: [packageType || "1"] },
-            ...(phone ? [{ customFieldId: "naIF5S", value: [phone] }] : []),
-          ],
-        }),
+      console.log(`📧 Dodawanie ${email} do Pakietu ${packageType} (${campaignId}) i WSZYSTKIE KONTAKTY`);
+
+      // 1. Dodaj do listy pakietu (tutaj jest autoresponder z wiadomością powitalną)
+      let addedToPackage = false;
+      const packageResponse = await addContactToGetResponse(email, fullName, campaignId, packageType, phone);
+
+      if (packageResponse.ok || packageResponse.status === 202) {
+        console.log(`✅ Dodano do Pakietu ${packageType}`);
+        addedToPackage = true;
+      } else {
+        const errorData = await packageResponse.json();
+        if (errorData.code === 1008) {
+          console.log(`ℹ️ Kontakt już istnieje w Pakiecie ${packageType}`);
+          addedToPackage = true;
+        } else {
+          console.error("❌ Błąd dodawania do pakietu:", errorData);
+        }
+      }
+
+      // 2. Dodaj do listy WSZYSTKIE KONTAKTY
+      let addedToAll = false;
+      try {
+        const allResponse = await addContactToGetResponse(email, fullName, ALL_CONTACTS_CAMPAIGN_ID, packageType, phone);
+
+        if (allResponse.ok || allResponse.status === 202) {
+          console.log("✅ Dodano do WSZYSTKIE KONTAKTY");
+          addedToAll = true;
+        } else {
+          const allError = await allResponse.json();
+          if (allError.code === 1008) {
+            console.log("ℹ️ Kontakt już istnieje w WSZYSTKIE KONTAKTY");
+            addedToAll = true;
+          } else {
+            console.warn("⚠️ Błąd dodawania do WSZYSTKIE KONTAKTY:", allError);
+          }
+        }
+      } catch (allErr) {
+        console.warn("⚠️ Wyjątek przy WSZYSTKIE KONTAKTY:", allErr);
+      }
+
+      // Odpowiedź
+      res.status(200).json({
+        success: true,
+        message: `Pacjent ${fullName} dodany do GetResponse`,
+        details: {
+          package: addedToPackage ? `Pakiet ${packageType}` : "błąd",
+          allContacts: addedToAll ? "OK" : "błąd"
+        }
       });
 
-      if (response.ok || response.status === 202) {
-        console.log("✅ Pacjent dodany do GetResponse:", email, "kampania:", campaignId);
-        res.status(200).json({ success: true, message: `Contact added to package ${packageType} campaign` });
-        return;
-      }
-
-      const errorData = await response.json();
-
-      // Kontakt już istnieje
-      if (errorData.code === 1008) {
-        console.log("ℹ️ Pacjent już istnieje w GetResponse:", email);
-        res.status(200).json({ success: true, message: "Contact already exists" });
-        return;
-      }
-
-      console.error("❌ GetResponse error:", errorData);
-      res.status(400).json({ success: false, error: errorData });
     } catch (error) {
-      console.error("❌ Error sending to GetResponse:", error);
+      console.error("❌ Error:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
