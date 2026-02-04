@@ -12,10 +12,10 @@ export const DEFAULT_AVAILABILITY: Omit<Availability, 'id'>[] = [
   // Krystian - Thursday 19:30-21:00
   { therapistId: '', dayOfWeek: 4, startTime: '19:30', endTime: '21:00', isActive: true },
 
-  // Waldek (Waldemar) - Wednesday 10:00-16:00, Thursday 08:00-13:00, Friday 08:00-13:00
-  { therapistId: '', dayOfWeek: 3, startTime: '10:00', endTime: '16:00', isActive: true },
-  { therapistId: '', dayOfWeek: 4, startTime: '08:00', endTime: '13:00', isActive: true },
-  { therapistId: '', dayOfWeek: 5, startTime: '08:00', endTime: '13:00', isActive: true },
+  // Waldek (Waldemar) - Wednesday 12:00-14:00, Thursday 07:00-11:00, Friday 07:00-11:00
+  { therapistId: '', dayOfWeek: 3, startTime: '12:00', endTime: '14:00', isActive: true },
+  { therapistId: '', dayOfWeek: 4, startTime: '07:00', endTime: '11:00', isActive: true },
+  { therapistId: '', dayOfWeek: 5, startTime: '07:00', endTime: '11:00', isActive: true },
 
   // Natalia - Monday 18:30-19:30, Thursday 16:30-17:30
   { therapistId: '', dayOfWeek: 1, startTime: '18:30', endTime: '19:30', isActive: true },
@@ -66,9 +66,9 @@ export const initializeDefaultAvailability = async (therapistId: string, therapi
     ];
   } else if (therapistName.includes('Waldemar') || therapistName.includes('Waldek')) {
     defaults = [
-      { therapistId, dayOfWeek: 3, startTime: '10:00', endTime: '16:00', isActive: true },
-      { therapistId, dayOfWeek: 4, startTime: '08:00', endTime: '13:00', isActive: true },
-      { therapistId, dayOfWeek: 5, startTime: '08:00', endTime: '13:00', isActive: true },
+      { therapistId, dayOfWeek: 3, startTime: '12:00', endTime: '14:00', isActive: true },
+      { therapistId, dayOfWeek: 4, startTime: '07:00', endTime: '11:00', isActive: true },
+      { therapistId, dayOfWeek: 5, startTime: '07:00', endTime: '11:00', isActive: true },
     ];
   } else if (therapistName.includes('Natalia')) {
     defaults = [
