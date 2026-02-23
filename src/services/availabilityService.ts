@@ -9,8 +9,8 @@ export const DAY_NAMES = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czw
 
 // Default availability schedules for MyWay therapists
 export const DEFAULT_AVAILABILITY: Omit<Availability, 'id'>[] = [
-  // Krystian - Thursday 19:30-21:00
-  { therapistId: '', dayOfWeek: 4, startTime: '19:30', endTime: '21:00', isActive: true },
+  // Krystian - Friday 19:30-21:00
+  { therapistId: '', dayOfWeek: 5, startTime: '19:30', endTime: '21:00', isActive: true },
 
   // Waldek (Waldemar) - Wednesday 12:00-14:00, Thursday 07:00-11:00, Friday 07:00-11:00
   { therapistId: '', dayOfWeek: 3, startTime: '12:00', endTime: '14:00', isActive: true },
@@ -62,7 +62,7 @@ export const initializeDefaultAvailability = async (therapistId: string, therapi
 
   if (therapistName.includes('Krystian')) {
     defaults = [
-      { therapistId, dayOfWeek: 4, startTime: '19:30', endTime: '21:00', isActive: true },
+      { therapistId, dayOfWeek: 5, startTime: '19:30', endTime: '21:00', isActive: true },
     ];
   } else if (therapistName.includes('Waldemar') || therapistName.includes('Waldek')) {
     defaults = [
