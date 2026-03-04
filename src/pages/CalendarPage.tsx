@@ -216,9 +216,15 @@ export function CalendarPage() {
       await createSession(newSessionData as CreateSessionData);
       setIsModalOpen(false);
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating session:', error);
-      alert('Błąd podczas tworzenia sesji');
+      if (error?.code === 'permission-denied') {
+        alert('Brak uprawnień do rezerwacji. Skontaktuj się z ośrodkiem MyWay pod numerem 731 395 295.');
+      } else if (error?.code === 'unavailable') {
+        alert('Serwer jest chwilowo niedostępny. Spróbuj ponownie za chwilę.');
+      } else {
+        alert('Nie udało się zapisać wizyty. Spróbuj ponownie lub zadzwoń: 731 395 295.');
+      }
     }
   };
 

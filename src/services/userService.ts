@@ -77,6 +77,15 @@ export const ensureUserExists = async (uid: string, email: string, displayName?:
       existingUser.displayName = displayName;
     }
 
+    // Re-check patient linking on every login (admin may have added patient record after registration)
+    if (existingUser.role === 'patient' && !existingUser.patientId) {
+      const patient = await findPatientByEmail(email);
+      if (patient) {
+        await setDoc(userRef, { patientId: patient.id }, { merge: true });
+        existingUser.patientId = patient.id;
+      }
+    }
+
     return existingUser;
   }
 
