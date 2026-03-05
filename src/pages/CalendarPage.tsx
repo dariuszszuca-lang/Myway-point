@@ -10,7 +10,9 @@ import {
   User,
   Calendar,
   Check,
-  AlertCircle
+  AlertCircle,
+  Mail,
+  Phone
 } from 'lucide-react';
 import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
@@ -696,6 +698,26 @@ export function CalendarPage() {
                         <p className="text-xs text-slate-500">{selectedSession.therapistName}</p>
                       </div>
                     </div>
+                    {/* Patient contact info */}
+                    {isAdmin && (() => {
+                      const sessionPatient = patients.find(p => p.id === selectedSession.patientId);
+                      if (!sessionPatient?.email && !sessionPatient?.phone) return null;
+                      return (
+                        <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-1.5">
+                          <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Dane kontaktowe</p>
+                          {sessionPatient?.email && (
+                            <a href={`mailto:${sessionPatient.email}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                              <Mail size={14} />{sessionPatient.email}
+                            </a>
+                          )}
+                          {sessionPatient?.phone && (
+                            <a href={`tel:${sessionPatient.phone}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                              <Phone size={14} />{sessionPatient.phone}
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Status actions - only for admin */}

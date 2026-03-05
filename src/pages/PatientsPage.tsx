@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getPatients, addPatient, updatePatient, deletePatient } from '../services/patientService';
 import { Patient } from '../types';
 import { PatientModal } from '../components/PatientModal';
-import { Plus, CheckCircle2, Activity } from 'lucide-react';
+import { Plus, CheckCircle2, Activity, Mail, Phone } from 'lucide-react';
 
 export function PatientsPage() {
     const [patients, setPatients] = useState<Patient[]>([]);
@@ -104,7 +104,19 @@ export function PatientsPage() {
                             </div>
                             <div>
                             <p className="font-bold text-slate-800">{p.name}</p>
-                            <p className="text-xs text-slate-500">ID: {p.id.substring(0,6)}</p>
+                            {p.email && (
+                              <p className="text-xs text-slate-500 flex items-center gap-1">
+                                <Mail size={10} />{p.email}
+                              </p>
+                            )}
+                            {p.phone && (
+                              <p className="text-xs text-slate-500 flex items-center gap-1">
+                                <Phone size={10} />{p.phone}
+                              </p>
+                            )}
+                            {!p.email && !p.phone && (
+                              <p className="text-xs text-slate-400 italic">Brak danych kontaktowych</p>
+                            )}
                             </div>
                         </div>
                         </td>
