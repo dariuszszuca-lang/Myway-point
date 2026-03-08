@@ -30,3 +30,8 @@ npm-debug.log*
 # Cache
 .cache/
 .eslintcache
+
+# Security - never commit env files
+.env
+.env.*
+!.env.example
