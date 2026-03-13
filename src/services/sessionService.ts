@@ -11,7 +11,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { Session, CreateSessionData, SessionStatus } from '../types';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 const sessionsCollectionRef = collection(db, 'sessions');
 
@@ -164,6 +164,20 @@ export const isTimeSlotAvailable = async (
   });
 
   return conflicting.length === 0;
+};
+
+// Check if patient already has a session this week (limit: 1/week)
+export const getPatientSessionsInWeek = async (patientId: string, date: string): Promise<number> => {
+  const targetDate = parseISO(date);
+  const weekStartDate = startOfWeek(targetDate, { weekStartsOn: 1 });
+  const weekEndDate = endOfWeek(targetDate, { weekStartsOn: 1 });
+  const weekStartStr = format(weekStartDate, 'yyyy-MM-dd');
+  const weekEndStr = format(weekEndDate, 'yyyy-MM-dd');
+
+  const sessions = await getSessionsByDateRange(weekStartStr, weekEndStr);
+  return sessions.filter(
+    s => s.patientId === patientId && s.status !== 'cancelled'
+  ).length;
 };
 
 // Get dashboard stats

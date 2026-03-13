@@ -104,5 +104,5 @@ export const DEFAULT_SESSIONS_PACKAGE = 20;
 export const WORKING_HOURS = {
   start: 7, // 7:00 - Waldek zaczyna o 7:00
   end: 22, // 22:00 - żeby pokazać slot 21:00 dla wieczornych sesji
-  slotDuration: 30, // minutes - co pół godziny
+  slotDuration: 35, // minutes - 30 min sesja + 5 min przerwa organizacyjna
 };

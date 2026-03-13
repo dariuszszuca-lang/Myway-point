@@ -14,7 +14,7 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession } from '../services/sessionService';
+import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailable } from '../services/availabilityService';
@@ -23,12 +23,17 @@ import { useAuth } from '../context/AuthContext';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
 
-// Generate time slots (every 30 minutes)
+// Generate time slots dynamically based on slotDuration
 const generateTimeSlots = () => {
   const slots: string[] = [];
-  for (let hour = WORKING_HOURS.start; hour < WORKING_HOURS.end; hour++) {
-    slots.push(`${hour.toString().padStart(2, '0')}:00`);
-    slots.push(`${hour.toString().padStart(2, '0')}:30`);
+  const startMinutes = WORKING_HOURS.start * 60;
+  const endMinutes = WORKING_HOURS.end * 60;
+  let current = startMinutes;
+  while (current < endMinutes) {
+    const h = Math.floor(current / 60);
+    const m = current % 60;
+    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+    current += WORKING_HOURS.slotDuration;
   }
   return slots;
 };
@@ -212,6 +217,23 @@ export function CalendarPage() {
         );
         return;
       }
+    }
+
+    // Check weekly limit: max 1 session per patient per week
+    try {
+      const weekCount = await getPatientSessionsInWeek(
+        newSessionData.patientId,
+        newSessionData.date
+      );
+      if (weekCount >= 1) {
+        alert(isAdmin
+          ? 'Ten pacjent ma już zarezerwowaną sesję w tym tygodniu. Limit: 1 sesja na tydzień.'
+          : 'Masz już zarezerwowaną sesję w tym tygodniu. Możesz zarezerwować maksymalnie 1 sesję tygodniowo.'
+        );
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking weekly limit:', error);
     }
 
     try {
