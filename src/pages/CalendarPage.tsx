@@ -203,6 +203,19 @@ export function CalendarPage() {
       return;
     }
 
+    // Check minimum 3 days in advance (only for patients, admin can bypass)
+    if (!isAdmin) {
+      const sessionDate = parseISO(newSessionData.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffTime = sessionDate.getTime() - today.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays < 3) {
+        alert('Rezerwacja możliwa minimum 3 dni przed terminem. Wybierz późniejszy termin lub zadzwoń: 731 395 295.');
+        return;
+      }
+    }
+
     // Check if patient has remaining sessions
     const checkPatient = isAdmin
       ? patients.find(p => p.id === newSessionData.patientId)
