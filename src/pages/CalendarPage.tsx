@@ -14,7 +14,7 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-import { getSessionsByDateRange, createSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek } from '../services/sessionService';
+import { getSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailable } from '../services/availabilityService';
@@ -64,7 +64,7 @@ export function CalendarPage() {
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'view'>('create');
+  const [modalMode, setModalMode] = useState<'create' | 'view' | 'edit'>('create');
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [newSessionData, setNewSessionData] = useState<Partial<CreateSessionData>>({});
 
@@ -189,6 +189,47 @@ export function CalendarPage() {
     setModalMode('view');
     setSelectedSession(session);
     setIsModalOpen(true);
+  };
+
+  const openEditSessionModal = (session: Session) => {
+    setModalMode('edit');
+    setSelectedSession(session);
+    setNewSessionData({
+      date: session.date,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      therapistId: session.therapistId,
+      therapistName: session.therapistName,
+      patientId: session.patientId,
+      patientName: session.patientName,
+      notes: session.notes || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleEditSession = async () => {
+    if (!selectedSession || !newSessionData.patientId || !newSessionData.therapistId || !newSessionData.date) {
+      alert('Wypełnij wszystkie pola');
+      return;
+    }
+
+    try {
+      await updateSession(selectedSession.id, {
+        date: newSessionData.date,
+        startTime: newSessionData.startTime,
+        endTime: newSessionData.endTime,
+        therapistId: newSessionData.therapistId,
+        therapistName: newSessionData.therapistName,
+        patientId: newSessionData.patientId,
+        patientName: newSessionData.patientName,
+        notes: newSessionData.notes,
+      });
+      setIsModalOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Error updating session:', error);
+      alert('Błąd podczas aktualizacji sesji');
+    }
   };
 
   const handleCreateSession = async () => {
@@ -507,7 +548,7 @@ export function CalendarPage() {
             {/* Modal header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-800">
-                {modalMode === 'create' ? 'Zapisz pacjenta na wizytę' : 'Szczegóły sesji'}
+                {modalMode === 'create' ? 'Zapisz pacjenta na wizytę' : modalMode === 'edit' ? 'Edytuj sesję' : 'Szczegóły sesji'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -519,10 +560,10 @@ export function CalendarPage() {
 
             {/* Modal content */}
             <div className="p-6 space-y-4">
-              {modalMode === 'create' ? (
+              {(modalMode === 'create' || modalMode === 'edit') ? (
                 <>
-                  {/* Therapist info - if selected */}
-                  {selectedTherapist !== 'all' && newSessionData.therapistId && (
+                  {/* Therapist info - if selected (only in create mode with therapist filter) */}
+                  {modalMode === 'create' && selectedTherapist !== 'all' && newSessionData.therapistId && (
                     <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-myway-primary to-teal-600 rounded-xl text-white">
                       <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-xl font-bold">
                         {newSessionData.therapistName?.charAt(0)}
@@ -536,23 +577,58 @@ export function CalendarPage() {
                     </div>
                   )}
 
-                  {/* Date & Time display */}
-                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
-                    <Calendar size={20} className="text-myway-primary" />
-                    <div>
-                      <p className="text-sm font-bold text-slate-700">
-                        {newSessionData.date && format(parseISO(newSessionData.date), 'EEEE, d MMMM yyyy', { locale: pl })}
-                      </p>
-                      <p className="text-sm text-slate-500">
-                        Godzina: {newSessionData.startTime} - {newSessionData.endTime}
-                      </p>
+                  {/* Date & Time - editable in edit mode, display in create mode */}
+                  {modalMode === 'edit' ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Data</label>
+                        <input
+                          type="date"
+                          value={newSessionData.date || ''}
+                          onChange={(e) => setNewSessionData(prev => ({ ...prev, date: e.target.value }))}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Godzina rozpoczęcia</label>
+                        <select
+                          value={newSessionData.startTime || ''}
+                          onChange={(e) => {
+                            const startTime = e.target.value;
+                            setNewSessionData(prev => ({
+                              ...prev,
+                              startTime,
+                              endTime: addMinutesToTime(startTime, WORKING_HOURS.slotDuration),
+                            }));
+                          }}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                        >
+                          {TIME_SLOTS.map(slot => (
+                            <option key={slot} value={slot}>{slot} - {addMinutesToTime(slot, WORKING_HOURS.slotDuration)}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
+                      <Calendar size={20} className="text-myway-primary" />
+                      <div>
+                        <p className="text-sm font-bold text-slate-700">
+                          {newSessionData.date && format(parseISO(newSessionData.date), 'EEEE, d MMMM yyyy', { locale: pl })}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          Godzina: {newSessionData.startTime} - {newSessionData.endTime}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Therapist select - only if "all" view */}
-                  {selectedTherapist === 'all' && newSessionData.date && (
+                  {/* Therapist select - in edit mode always, in create mode only if "all" view */}
+                  {(modalMode === 'edit' || (selectedTherapist === 'all' && newSessionData.date)) && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Terapeuta (dostępni w tym terminie)</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        {modalMode === 'edit' ? 'Terapeuta' : 'Terapeuta (dostępni w tym terminie)'}
+                      </label>
                       <select
                         value={newSessionData.therapistId || ''}
                         onChange={(e) => {
@@ -565,9 +641,14 @@ export function CalendarPage() {
                         }}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
                       >
-                        {getAvailableTherapists(parseISO(newSessionData.date), newSessionData.startTime || '09:00').map(t => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
+                        {modalMode === 'edit'
+                          ? therapists.map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))
+                          : getAvailableTherapists(parseISO(newSessionData.date!), newSessionData.startTime || '09:00').map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))
+                        }
                       </select>
                     </div>
                   )}
@@ -755,27 +836,38 @@ export function CalendarPage() {
                     })()}
                   </div>
 
-                  {/* Status actions - only for admin */}
+                  {/* Admin actions: Edit + Status */}
                   {isAdmin && (
-                    <div className="pt-4 border-t border-slate-100">
-                      <p className="text-sm font-medium text-slate-700 mb-3">Zmień status:</p>
-                      <div className="grid grid-cols-2 gap-2">
+                    <>
+                      <div className="pt-4 border-t border-slate-100">
                         <button
-                          onClick={() => handleStatusChange(selectedSession.id, 'completed')}
-                          className="flex items-center justify-center gap-2 p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                          onClick={() => openEditSessionModal(selectedSession)}
+                          className="w-full flex items-center justify-center gap-2 p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors font-medium"
                         >
-                          <Check size={16} />
-                          Zakończona
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(selectedSession.id, 'no-show')}
-                          className="flex items-center justify-center gap-2 p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors"
-                        >
-                          <AlertCircle size={16} />
-                          Nieobecność
+                          <Calendar size={16} />
+                          Edytuj sesję
                         </button>
                       </div>
-                    </div>
+                      <div className="pt-2">
+                        <p className="text-sm font-medium text-slate-700 mb-3">Zmień status:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handleStatusChange(selectedSession.id, 'completed')}
+                            className="flex items-center justify-center gap-2 p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                          >
+                            <Check size={16} />
+                            Zakończona
+                          </button>
+                          <button
+                            onClick={() => handleStatusChange(selectedSession.id, 'no-show')}
+                            className="flex items-center justify-center gap-2 p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors"
+                          >
+                            <AlertCircle size={16} />
+                            Nieobecność
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </>
               )}
@@ -796,6 +888,21 @@ export function CalendarPage() {
                     className="flex-1 py-3 px-4 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/20"
                   >
                     Zapisz na wizytę
+                  </button>
+                </>
+              ) : modalMode === 'edit' ? (
+                <>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Anuluj
+                  </button>
+                  <button
+                    onClick={handleEditSession}
+                    className="flex-1 py-3 px-4 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/20"
+                  >
+                    Zapisz zmiany
                   </button>
                 </>
               ) : selectedSession && (
