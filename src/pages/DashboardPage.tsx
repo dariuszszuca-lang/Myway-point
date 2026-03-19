@@ -118,6 +118,16 @@ export function DashboardPage() {
 
   const handleEditSession = async () => {
     if (!selectedSession || !editData.patientId || !editData.therapistId || !editData.date) return;
+
+    // Block past dates
+    const editDate = parseISO(editData.date);
+    const todayCheck = new Date();
+    todayCheck.setHours(0, 0, 0, 0);
+    if (editDate.getTime() < todayCheck.getTime()) {
+      alert('Nie można ustawić sesji na datę w przeszłości.');
+      return;
+    }
+
     try {
       await updateSession(selectedSession.id, {
         date: editData.date,

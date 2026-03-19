@@ -54,11 +54,12 @@ service cloud.firestore {
     }
 
     // SESSIONS - sesje/rezerwacje
+    // Walidacja dat (brak dat wstecz, 3 dni min dla pacjentów) — frontend-side
+    // Firestore rules nie obsługują porównania stringów dat z request.time
     match /sessions/{sessionId} {
       // Admini mają pełny dostęp
       allow read, write: if isAdmin();
       // Wszyscy zalogowani mogą czytać sesje (potrzebne do wyświetlania zajętych terminów)
-      // Na frontendzie filtrujemy - pacjent widzi tylko że termin jest zajęty, nie widzi danych innych pacjentów
       allow read: if isAuthenticated();
       // Pacjent może tworzyć rezerwację tylko dla siebie
       allow create: if isAuthenticated() &&

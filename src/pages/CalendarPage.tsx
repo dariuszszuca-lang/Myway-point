@@ -213,6 +213,15 @@ export function CalendarPage() {
       return;
     }
 
+    // Block past dates
+    const editDate = parseISO(newSessionData.date);
+    const todayEdit = new Date();
+    todayEdit.setHours(0, 0, 0, 0);
+    if (editDate.getTime() < todayEdit.getTime()) {
+      alert('Nie można ustawić sesji na datę w przeszłości.');
+      return;
+    }
+
     try {
       await updateSession(selectedSession.id, {
         date: newSessionData.date,
@@ -244,17 +253,22 @@ export function CalendarPage() {
       return;
     }
 
+    // Block past dates for everyone
+    const sessionDate = parseISO(newSessionData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = sessionDate.getTime() - today.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      alert('Nie można tworzyć sesji na daty w przeszłości.');
+      return;
+    }
+
     // Check minimum 3 days in advance (only for patients, admin can bypass)
-    if (!isAdmin) {
-      const sessionDate = parseISO(newSessionData.date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const diffTime = sessionDate.getTime() - today.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays < 3) {
-        alert('Rezerwacja możliwa minimum 3 dni przed terminem. Wybierz późniejszy termin lub zadzwoń: 731 395 295.');
-        return;
-      }
+    if (!isAdmin && diffDays < 3) {
+      alert('Rezerwacja możliwa minimum 3 dni przed terminem. Wybierz późniejszy termin lub zadzwoń: 731 395 295.');
+      return;
     }
 
     // Check if patient has remaining sessions
