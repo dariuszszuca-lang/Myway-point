@@ -495,10 +495,15 @@ export function CalendarPage() {
                   const isToday = isSameDay(day, new Date());
                   const slotSessions = getSessionsForSlot(day, time);
 
+                  // Block past dates - no creating sessions in the past
+                  const todayStart = new Date();
+                  todayStart.setHours(0, 0, 0, 0);
+                  const isPast = day.getTime() < todayStart.getTime();
+
                   // Check availability based on selected therapist
-                  const isAvailable = selectedTherapist !== 'all'
+                  const isAvailable = !isPast && (selectedTherapist !== 'all'
                     ? isTherapistAvailable(day, time, selectedTherapist)
-                    : isAnyTherapistAvailable(day, time);
+                    : isAnyTherapistAvailable(day, time));
 
                   return (
                     <div
