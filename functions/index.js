@@ -17,7 +17,7 @@ async function sendEmailWithResend(to, subject, html, text) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "MyWay Point <rezerwacje@osrodek-myway.pl>",
+      from: "MyWay Point <terapia@osrodek-myway.pl>",
       to: [to],
       subject: subject,
       html: html,
@@ -323,6 +323,139 @@ function getFarewellEmailPlain(firstName, packageType) {
 }
 
 // =======================================================================
+// SESSION EMAIL TEMPLATES (Resend - powiadomienia o sesjach)
+// =======================================================================
+
+function getSessionConfirmationHtml(patientName, therapistName, date, startTime, endTime, sessionId) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;margin-top:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+  <div style="background:linear-gradient(135deg,#0d9488,#14b8a6);padding:32px 24px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">Potwierdzenie wizyty</h1>
+    <p style="color:#ccfbf1;margin:8px 0 0;font-size:14px;">Ośrodek My Way</p>
+  </div>
+  <div style="padding:32px 24px;">
+    <p style="font-size:16px;color:#333;margin:0 0 16px;">Cześć <strong>${patientName}</strong>,</p>
+    <p style="font-size:15px;color:#555;line-height:1.6;margin:0 0 20px;">Twoja wizyta została zarezerwowana.</p>
+    <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:20px;margin:0 0 20px;">
+      <table style="width:100%;font-size:14px;color:#555;">
+        <tr><td style="padding:8px 0;font-weight:bold;width:120px;">Terapeuta:</td><td style="padding:8px 0;color:#333;font-weight:bold;">${therapistName}</td></tr>
+        <tr><td style="padding:8px 0;font-weight:bold;">Data:</td><td style="padding:8px 0;color:#333;font-weight:bold;">${formatDatePL(date)}</td></tr>
+        <tr><td style="padding:8px 0;font-weight:bold;">Godzina:</td><td style="padding:8px 0;color:#333;font-weight:bold;">${startTime} - ${endTime}</td></tr>
+      </table>
+    </div>
+    <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 8px;">Jeśli chcesz zmienić lub odwołać wizytę, zaloguj się na <a href="https://mywaypoint.pl" style="color:#0d9488;font-weight:bold;">mywaypoint.pl</a> lub zadzwoń:</p>
+    <p style="margin:0;text-align:center;"><a href="tel:+48731395295" style="font-size:18px;color:#0d9488;font-weight:bold;text-decoration:none;">731 395 295</a></p>
+  </div>
+  <div style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+    <p style="margin:0;color:#9ca3af;font-size:12px;">Ośrodek My Way · ul. Wichrowe Wzgórza 21, Kąpino 84-200</p>
+  </div>
+</div>
+</body></html>`;
+}
+
+function getSessionChangeHtml(patientName, therapistName, date, startTime, endTime, changesText, sessionId) {
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,#2563eb,#3b82f6);padding:20px;border-radius:10px 10px 0 0;">
+    <h1 style="color:white;margin:0;font-size:24px;">Zmiana terminu wizyty</h1>
+  </div>
+  <div style="background:#f8fafc;padding:25px;border:1px solid #e2e8f0;border-top:none;">
+    <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px;margin:0 0 16px;">
+      <p style="margin:0;font-size:14px;color:#92400e;"><strong>Zmieniono:</strong> ${changesText.replace(/\n/g, "<br>")}</p>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;width:140px;">Pacjent:</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#1e293b;">${patientName}</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;">Terapeuta:</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#1e293b;">${therapistName}</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;">Nowa data:</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#1e293b;">${formatDatePL(date)}</td></tr>
+      <tr><td style="padding:10px 0;color:#64748b;">Nowa godzina:</td><td style="padding:10px 0;font-weight:bold;color:#1e293b;">${startTime} - ${endTime}</td></tr>
+    </table>
+  </div>
+  <div style="background:#1e293b;padding:15px;border-radius:0 0 10px 10px;text-align:center;">
+    <p style="color:#94a3b8;margin:0;font-size:12px;"><strong style="color:#fbbf24;">MyWay Point</strong></p>
+  </div>
+</div>`;
+}
+
+function getSessionChangePatientHtml(patientName, therapistName, date, startTime, endTime, changesText) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;margin-top:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+  <div style="background:linear-gradient(135deg,#2563eb,#3b82f6);padding:32px 24px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">Zmiana terminu wizyty</h1>
+    <p style="color:#bfdbfe;margin:8px 0 0;font-size:14px;">Ośrodek My Way</p>
+  </div>
+  <div style="padding:32px 24px;">
+    <p style="font-size:16px;color:#333;margin:0 0 16px;">Cześć <strong>${patientName}</strong>,</p>
+    <p style="font-size:15px;color:#555;line-height:1.6;margin:0 0 20px;">Termin Twojej wizyty został zmieniony.</p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:20px;margin:0 0 20px;">
+      <h3 style="margin:0 0 12px;color:#2563eb;font-size:15px;">Nowy termin:</h3>
+      <table style="width:100%;font-size:14px;color:#555;">
+        <tr><td style="padding:8px 0;font-weight:bold;width:120px;">Terapeuta:</td><td style="padding:8px 0;color:#333;font-weight:bold;">${therapistName}</td></tr>
+        <tr><td style="padding:8px 0;font-weight:bold;">Data:</td><td style="padding:8px 0;color:#333;font-weight:bold;">${formatDatePL(date)}</td></tr>
+        <tr><td style="padding:8px 0;font-weight:bold;">Godzina:</td><td style="padding:8px 0;color:#333;font-weight:bold;">${startTime} - ${endTime}</td></tr>
+      </table>
+    </div>
+    <p style="font-size:14px;color:#555;margin:0 0 8px;">W razie pytań dzwoń:</p>
+    <p style="margin:0;text-align:center;"><a href="tel:+48731395295" style="font-size:18px;color:#0d9488;font-weight:bold;text-decoration:none;">731 395 295</a></p>
+  </div>
+  <div style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+    <p style="margin:0;color:#9ca3af;font-size:12px;">Ośrodek My Way · ul. Wichrowe Wzgórza 21, Kąpino 84-200</p>
+  </div>
+</div>
+</body></html>`;
+}
+
+function getSessionCancelledHtml(patientName, therapistName, date, startTime, endTime, sessionId) {
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,#dc2626,#ef4444);padding:20px;border-radius:10px 10px 0 0;">
+    <h1 style="color:white;margin:0;font-size:24px;">Wizyta odwołana / usunięta</h1>
+  </div>
+  <div style="background:#f8fafc;padding:25px;border:1px solid #e2e8f0;border-top:none;">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;width:140px;">Pacjent:</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#1e293b;">${patientName}</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;">Terapeuta:</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#1e293b;">${therapistName}</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;">Data:</td><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-weight:bold;color:#dc2626;text-decoration:line-through;">${formatDatePL(date)}</td></tr>
+      <tr><td style="padding:10px 0;color:#64748b;">Godzina:</td><td style="padding:10px 0;font-weight:bold;color:#dc2626;text-decoration:line-through;">${startTime} - ${endTime}</td></tr>
+    </table>
+  </div>
+  <div style="background:#1e293b;padding:15px;border-radius:0 0 10px 10px;text-align:center;">
+    <p style="color:#94a3b8;margin:0;font-size:12px;"><strong style="color:#fbbf24;">MyWay Point</strong></p>
+  </div>
+</div>`;
+}
+
+function getSessionCancelledPatientHtml(patientName, therapistName, date, startTime, endTime) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;margin-top:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+  <div style="background:linear-gradient(135deg,#dc2626,#ef4444);padding:32px 24px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:24px;">Wizyta odwołana</h1>
+    <p style="color:#fecaca;margin:8px 0 0;font-size:14px;">Ośrodek My Way</p>
+  </div>
+  <div style="padding:32px 24px;">
+    <p style="font-size:16px;color:#333;margin:0 0 16px;">Cześć <strong>${patientName}</strong>,</p>
+    <p style="font-size:15px;color:#555;line-height:1.6;margin:0 0 20px;">Twoja wizyta została odwołana.</p>
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:20px;margin:0 0 20px;">
+      <table style="width:100%;font-size:14px;color:#555;">
+        <tr><td style="padding:8px 0;font-weight:bold;width:120px;">Terapeuta:</td><td style="padding:8px 0;color:#333;">${therapistName}</td></tr>
+        <tr><td style="padding:8px 0;font-weight:bold;">Data:</td><td style="padding:8px 0;color:#dc2626;text-decoration:line-through;">${formatDatePL(date)}</td></tr>
+        <tr><td style="padding:8px 0;font-weight:bold;">Godzina:</td><td style="padding:8px 0;color:#dc2626;text-decoration:line-through;">${startTime} - ${endTime}</td></tr>
+      </table>
+    </div>
+    <p style="font-size:15px;color:#555;line-height:1.6;margin:0 0 8px;">Aby umówić nowy termin, zaloguj się na <a href="https://mywaypoint.pl" style="color:#0d9488;font-weight:bold;">mywaypoint.pl</a> lub zadzwoń:</p>
+    <p style="margin:0;text-align:center;"><a href="tel:+48731395295" style="font-size:18px;color:#0d9488;font-weight:bold;text-decoration:none;">731 395 295</a></p>
+  </div>
+  <div style="background:#f8fafc;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+    <p style="margin:0;color:#9ca3af;font-size:12px;">Ośrodek My Way · ul. Wichrowe Wzgórza 21, Kąpino 84-200</p>
+  </div>
+</div>
+</body></html>`;
+}
+
+// =======================================================================
 // CLOUD FUNCTIONS
 // =======================================================================
 
@@ -591,8 +724,26 @@ exports.onSessionCreated = functions
     const text = `Nowa rezerwacja w systemie MyWay Point\nUsługa: Konsultacja Terapeutyczna (${session.therapistName})\nTerapeuta: ${session.therapistName}\nData: ${formatDatePL(session.date)}\nGodzina: ${session.startTime} - ${session.endTime}\nPacjent: ${session.patientName}\nID rezerwacji: ${sessionId.substring(0, 8).toUpperCase()}\n${session.notes ? `Notatki: ${session.notes}` : ""}\nMyWay Point`;
 
     try {
+      // 1. Email do terapeutów (terapia@)
       const result = await sendEmailWithResend("terapia@osrodek-myway.pl", `Nowa rezerwacja - ${session.patientName} u ${session.therapistName}`, html, text);
-      console.log("Email wysłany pomyślnie:", result);
+      console.log("Email do terapeutów wysłany:", result);
+
+      // 2. Email do pacjenta (jeśli ma email w bazie)
+      try {
+        const patientSnap = await admin.firestore().collection("patients").doc(session.patientId).get();
+        if (patientSnap.exists && patientSnap.data().email) {
+          const patientEmail = patientSnap.data().email;
+          const patientHtml = getSessionConfirmationHtml(session.patientName, session.therapistName, session.date, session.startTime, session.endTime, sessionId);
+          const patientText = `Potwierdzenie rezerwacji\nTerapeuta: ${session.therapistName}\nData: ${formatDatePL(session.date)}\nGodzina: ${session.startTime} - ${session.endTime}\n\nW razie pytań dzwoń: 731 395 295\nOśrodek My Way`;
+          await sendEmailWithResend(patientEmail, `Potwierdzenie wizyty - ${formatDatePL(session.date)} o ${session.startTime}`, patientHtml, patientText);
+          console.log(`Email potwierdzenia wysłany do pacjenta: ${patientEmail}`);
+        } else {
+          console.log("Pacjent nie ma emaila w bazie - pomijam powiadomienie");
+        }
+      } catch (patientErr) {
+        console.error("Błąd wysyłania emaila do pacjenta:", patientErr);
+      }
+
       return { success: true, id: result.id };
     } catch (error) {
       console.error("Błąd wysyłania emaila:", error);
@@ -621,6 +772,108 @@ exports.sendSessionNotification = functions
     } catch (error) {
       console.error("Błąd:", error);
       throw new functions.https.HttpsError("internal", error.message);
+    }
+  });
+
+/**
+ * Trigger: gdy sesja zostaje zmieniona (data, godzina, terapeuta, status)
+ */
+exports.onSessionUpdated = functions
+  .region("europe-west1")
+  .firestore.document("sessions/{sessionId}")
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    const sessionId = context.params.sessionId;
+
+    // Sprawdź czy zmienił się termin, terapeuta lub status
+    const dateChanged = before.date !== after.date || before.startTime !== after.startTime || before.endTime !== after.endTime;
+    const therapistChanged = before.therapistId !== after.therapistId;
+    const statusChanged = before.status !== after.status;
+
+    if (!dateChanged && !therapistChanged && !statusChanged) {
+      console.log("Zmiana nie dotyczy terminu/terapeuty/statusu - pomijam powiadomienie");
+      return null;
+    }
+
+    // Powiadomienie o zmianie terminu / terapeuty
+    if (dateChanged || therapistChanged) {
+      const changes = [];
+      if (dateChanged) changes.push(`Data: ${formatDatePL(before.date)} ${before.startTime} → ${formatDatePL(after.date)} ${after.startTime}`);
+      if (therapistChanged) changes.push(`Terapeuta: ${before.therapistName} → ${after.therapistName}`);
+      const changesText = changes.join("\n");
+
+      const html = getSessionChangeHtml(after.patientName, after.therapistName, after.date, after.startTime, after.endTime, changesText, sessionId);
+      const text = `Zmiana terminu wizyty\nPacjent: ${after.patientName}\nNowy termin: ${formatDatePL(after.date)}, ${after.startTime} - ${after.endTime}\nTerapeuta: ${after.therapistName}\nZmiany: ${changesText}\nMyWay Point`;
+
+      try {
+        // Email do terapeutów
+        await sendEmailWithResend("terapia@osrodek-myway.pl", `Zmiana terminu - ${after.patientName} u ${after.therapistName}`, html, text);
+        console.log("Email o zmianie wysłany do terapeutów");
+
+        // Email do pacjenta
+        const patientSnap = await admin.firestore().collection("patients").doc(after.patientId).get();
+        if (patientSnap.exists && patientSnap.data().email) {
+          const patientHtml = getSessionChangePatientHtml(after.patientName, after.therapistName, after.date, after.startTime, after.endTime, changesText);
+          const patientText = `Zmiana terminu Twojej wizyty\nNowy termin: ${formatDatePL(after.date)}, ${after.startTime} - ${after.endTime}\nTerapeuta: ${after.therapistName}\n\nW razie pytań dzwoń: 731 395 295\nOśrodek My Way`;
+          await sendEmailWithResend(patientSnap.data().email, `Zmiana terminu wizyty - ${formatDatePL(after.date)} o ${after.startTime}`, patientHtml, patientText);
+          console.log(`Email o zmianie wysłany do pacjenta: ${patientSnap.data().email}`);
+        }
+      } catch (error) {
+        console.error("Błąd wysyłania emaila o zmianie:", error);
+      }
+    }
+
+    // Powiadomienie o odwołaniu (cancelled)
+    if (statusChanged && after.status === "cancelled") {
+      const html = getSessionCancelledHtml(after.patientName, after.therapistName, after.date, after.startTime, after.endTime, sessionId);
+      const text = `Odwołana wizyta\nPacjent: ${after.patientName}\nTermin: ${formatDatePL(after.date)}, ${after.startTime} - ${after.endTime}\nTerapeuta: ${after.therapistName}\nMyWay Point`;
+
+      try {
+        await sendEmailWithResend("terapia@osrodek-myway.pl", `Odwołana wizyta - ${after.patientName} u ${after.therapistName}`, html, text);
+        console.log("Email o odwołaniu wysłany do terapeutów");
+
+        const patientSnap = await admin.firestore().collection("patients").doc(after.patientId).get();
+        if (patientSnap.exists && patientSnap.data().email) {
+          const patientText = `Twoja wizyta została odwołana.\nTermin: ${formatDatePL(after.date)}, ${after.startTime} - ${after.endTime}\nTerapeuta: ${after.therapistName}\n\nAby umówić nowy termin: mywaypoint.pl lub dzwoń: 731 395 295\nOśrodek My Way`;
+          await sendEmailWithResend(patientSnap.data().email, `Wizyta odwołana - ${formatDatePL(after.date)}`, getSessionCancelledPatientHtml(after.patientName, after.therapistName, after.date, after.startTime, after.endTime), patientText);
+          console.log(`Email o odwołaniu wysłany do pacjenta: ${patientSnap.data().email}`);
+        }
+      } catch (error) {
+        console.error("Błąd wysyłania emaila o odwołaniu:", error);
+      }
+    }
+
+    return null;
+  });
+
+/**
+ * Trigger: gdy sesja zostaje usunięta
+ */
+exports.onSessionDeleted = functions
+  .region("europe-west1")
+  .firestore.document("sessions/{sessionId}")
+  .onDelete(async (snap, context) => {
+    const session = snap.data();
+    const sessionId = context.params.sessionId;
+    console.log("Usunięta sesja:", sessionId);
+
+    const html = getSessionCancelledHtml(session.patientName, session.therapistName, session.date, session.startTime, session.endTime, sessionId);
+    const text = `Usunięta wizyta\nPacjent: ${session.patientName}\nTermin: ${formatDatePL(session.date)}, ${session.startTime} - ${session.endTime}\nTerapeuta: ${session.therapistName}\nMyWay Point`;
+
+    try {
+      await sendEmailWithResend("terapia@osrodek-myway.pl", `Usunięta wizyta - ${session.patientName} u ${session.therapistName}`, html, text);
+      console.log("Email o usunięciu wysłany do terapeutów");
+
+      // Email do pacjenta
+      const patientSnap = await admin.firestore().collection("patients").doc(session.patientId).get();
+      if (patientSnap.exists && patientSnap.data().email) {
+        const patientText = `Twoja wizyta została odwołana.\nTermin: ${formatDatePL(session.date)}, ${session.startTime} - ${session.endTime}\nTerapeuta: ${session.therapistName}\n\nAby umówić nowy termin: mywaypoint.pl lub dzwoń: 731 395 295\nOśrodek My Way`;
+        await sendEmailWithResend(patientSnap.data().email, `Wizyta odwołana - ${formatDatePL(session.date)}`, getSessionCancelledPatientHtml(session.patientName, session.therapistName, session.date, session.startTime, session.endTime), patientText);
+        console.log(`Email o usunięciu wysłany do pacjenta: ${patientSnap.data().email}`);
+      }
+    } catch (error) {
+      console.error("Błąd wysyłania emaila o usunięciu:", error);
     }
   });
 
