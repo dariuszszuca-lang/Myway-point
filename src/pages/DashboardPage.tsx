@@ -11,14 +11,49 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
-  Activity
+  Activity,
+  X,
+  User,
+  Check,
+  Mail,
+  Phone
 } from 'lucide-react';
-import { getTodaySessions, getDashboardStats } from '../services/sessionService';
-import { getPatients } from '../services/patientService';
+import { parseISO } from 'date-fns';
+import { getTodaySessions, getDashboardStats, updateSession, updateSessionStatus, deleteSession } from '../services/sessionService';
+import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getTherapists, getTherapistColor } from '../services/therapistService';
-import { Session, Therapist, Patient } from '../types';
+import { Session, Therapist, Patient, WORKING_HOURS } from '../types';
+import { useAuth } from '../context/AuthContext';
+
+// Helper to add minutes to time string
+const addMinutesToTime = (time: string, minutes: number): string => {
+  const [h, m] = time.split(':').map(Number);
+  const totalMinutes = h * 60 + m + minutes;
+  const newH = Math.floor(totalMinutes / 60);
+  const newM = totalMinutes % 60;
+  return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
+};
+
+// Generate time slots
+const generateTimeSlots = () => {
+  const slots: string[] = [];
+  const startMinutes = WORKING_HOURS.start * 60;
+  const endMinutes = WORKING_HOURS.end * 60;
+  let current = startMinutes;
+  while (current < endMinutes) {
+    const h = Math.floor(current / 60);
+    const m = current % 60;
+    slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+    current += WORKING_HOURS.slotDuration;
+  }
+  return slots;
+};
+
+const TIME_SLOTS = generateTimeSlots();
 
 export function DashboardPage() {
+  const { isAdmin } = useAuth();
+
   const [todaySessions, setTodaySessions] = useState<Session[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -29,6 +64,12 @@ export function DashboardPage() {
     monthCompleted: 0,
   });
   const [loading, setLoading] = useState(true);
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [editData, setEditData] = useState<Partial<Session>>({});
 
   useEffect(() => {
     loadData();
@@ -51,6 +92,80 @@ export function DashboardPage() {
       console.error('Error loading dashboard data:', error);
     }
     setLoading(false);
+  };
+
+  const openViewModal = (session: Session) => {
+    setModalMode('view');
+    setSelectedSession(session);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (session: Session) => {
+    setModalMode('edit');
+    setSelectedSession(session);
+    setEditData({
+      date: session.date,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      therapistId: session.therapistId,
+      therapistName: session.therapistName,
+      patientId: session.patientId,
+      patientName: session.patientName,
+      notes: session.notes || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleEditSession = async () => {
+    if (!selectedSession || !editData.patientId || !editData.therapistId || !editData.date) return;
+    try {
+      await updateSession(selectedSession.id, {
+        date: editData.date,
+        startTime: editData.startTime,
+        endTime: editData.endTime,
+        therapistId: editData.therapistId,
+        therapistName: editData.therapistName,
+        patientId: editData.patientId,
+        patientName: editData.patientName,
+        notes: editData.notes,
+      });
+      setIsModalOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Error updating session:', error);
+      alert('Błąd podczas aktualizacji sesji');
+    }
+  };
+
+  const handleStatusChange = async (sessionId: string, newStatus: Session['status']) => {
+    try {
+      const previousStatus = selectedSession?.status;
+      const patientId = selectedSession?.patientId;
+      await updateSessionStatus(sessionId, newStatus);
+      if (isAdmin && patientId) {
+        if (newStatus === 'completed' && previousStatus !== 'completed') {
+          await incrementUsedSessions(patientId);
+        } else if (previousStatus === 'completed' && newStatus !== 'completed') {
+          await decrementUsedSessions(patientId);
+        }
+      }
+      setIsModalOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Error updating session:', error);
+      alert('Błąd podczas aktualizacji sesji');
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm('Czy na pewno chcesz usunąć tę sesję?')) return;
+    try {
+      await deleteSession(sessionId);
+      setIsModalOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Error deleting session:', error);
+    }
   };
 
   const today = new Date();
@@ -186,9 +301,10 @@ export function DashboardPage() {
                 const colors = getTherapistColor(therapistIndex);
 
                 return (
-                  <div
+                  <button
                     key={session.id}
-                    className="p-4 hover:bg-slate-50 transition-colors flex items-center gap-4"
+                    onClick={() => openViewModal(session)}
+                    className="w-full p-4 hover:bg-slate-50 transition-colors flex items-center gap-4 text-left cursor-pointer"
                   >
                     {/* Time */}
                     <div className="w-20 text-center">
@@ -207,7 +323,7 @@ export function DashboardPage() {
 
                     {/* Status */}
                     <div>{getStatusBadge(session.status)}</div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -305,6 +421,232 @@ export function DashboardPage() {
           <p className="text-sm text-white/60">Zarządzaj danymi pacjentów</p>
         </Link>
       </div>
+
+      {/* Session Modal */}
+      {isModalOpen && selectedSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md animate-fade-in">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800">
+                {modalMode === 'edit' ? 'Edytuj sesję' : 'Szczegóły sesji'}
+              </h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={20} className="text-slate-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {modalMode === 'edit' ? (
+                <>
+                  {/* Date */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Data</label>
+                    <input
+                      type="date"
+                      value={editData.date || ''}
+                      onChange={(e) => setEditData(prev => ({ ...prev, date: e.target.value }))}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                    />
+                  </div>
+                  {/* Time */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Godzina</label>
+                    <select
+                      value={editData.startTime || ''}
+                      onChange={(e) => {
+                        const startTime = e.target.value;
+                        setEditData(prev => ({
+                          ...prev,
+                          startTime,
+                          endTime: addMinutesToTime(startTime, WORKING_HOURS.slotDuration),
+                        }));
+                      }}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                    >
+                      {TIME_SLOTS.map(slot => (
+                        <option key={slot} value={slot}>{slot} - {addMinutesToTime(slot, WORKING_HOURS.slotDuration)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Therapist */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Terapeuta</label>
+                    <select
+                      value={editData.therapistId || ''}
+                      onChange={(e) => {
+                        const therapist = therapists.find(t => t.id === e.target.value);
+                        setEditData(prev => ({
+                          ...prev,
+                          therapistId: e.target.value,
+                          therapistName: therapist?.name,
+                        }));
+                      }}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                    >
+                      {therapists.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Patient */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Pacjent</label>
+                    <select
+                      value={editData.patientId || ''}
+                      onChange={(e) => {
+                        const patient = patients.find(p => p.id === e.target.value);
+                        setEditData(prev => ({
+                          ...prev,
+                          patientId: e.target.value,
+                          patientName: patient?.name,
+                        }));
+                      }}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20"
+                    >
+                      {patients.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Notatki</label>
+                    <textarea
+                      value={editData.notes || ''}
+                      onChange={(e) => setEditData(prev => ({ ...prev, notes: e.target.value }))}
+                      rows={3}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20 resize-none"
+                      placeholder="Dodatkowe informacje..."
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* View mode */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                      <Calendar size={18} className="text-slate-500" />
+                      <span className="text-sm font-medium text-slate-700">
+                        {format(parseISO(selectedSession.date), 'EEEE, d MMMM yyyy', { locale: pl })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                      <Clock size={18} className="text-slate-500" />
+                      <span className="text-sm font-medium text-slate-700">
+                        {selectedSession.startTime} - {selectedSession.endTime}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                      <User size={18} className="text-slate-500" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">{selectedSession.patientName}</p>
+                        <p className="text-xs text-slate-500">{selectedSession.therapistName}</p>
+                      </div>
+                    </div>
+                    {/* Contact info */}
+                    {isAdmin && (() => {
+                      const sessionPatient = patients.find(p => p.id === selectedSession.patientId);
+                      if (!sessionPatient?.email && !sessionPatient?.phone) return null;
+                      return (
+                        <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-1.5">
+                          <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Dane kontaktowe</p>
+                          {sessionPatient?.email && (
+                            <a href={`mailto:${sessionPatient.email}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                              <Mail size={14} />{sessionPatient.email}
+                            </a>
+                          )}
+                          {sessionPatient?.phone && (
+                            <a href={`tel:${sessionPatient.phone}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                              <Phone size={14} />{sessionPatient.phone}
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Admin actions */}
+                  {isAdmin && (
+                    <>
+                      <div className="pt-4 border-t border-slate-100">
+                        <button
+                          onClick={() => openEditModal(selectedSession)}
+                          className="w-full flex items-center justify-center gap-2 p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors font-medium"
+                        >
+                          <Calendar size={16} />
+                          Edytuj sesję
+                        </button>
+                      </div>
+                      <div className="pt-2">
+                        <p className="text-sm font-medium text-slate-700 mb-3">Zmień status:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handleStatusChange(selectedSession.id, 'completed')}
+                            className="flex items-center justify-center gap-2 p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                          >
+                            <Check size={16} />
+                            Zakończona
+                          </button>
+                          <button
+                            onClick={() => handleStatusChange(selectedSession.id, 'no-show')}
+                            className="flex items-center justify-center gap-2 p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-100 transition-colors"
+                          >
+                            <AlertCircle size={16} />
+                            Nieobecność
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 p-6 border-t border-slate-100">
+              {modalMode === 'edit' ? (
+                <>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Anuluj
+                  </button>
+                  <button
+                    onClick={handleEditSession}
+                    className="flex-1 py-3 px-4 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/20"
+                  >
+                    Zapisz zmiany
+                  </button>
+                </>
+              ) : (
+                <>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDeleteSession(selectedSession.id)}
+                      className="flex-1 py-3 px-4 bg-rose-50 text-rose-600 rounded-xl font-medium hover:bg-rose-100 transition-colors"
+                    >
+                      Usuń
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Zamknij
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
