@@ -16,11 +16,13 @@ import {
   User,
   Check,
   Mail,
-  Phone
+  Phone,
+  Minus,
+  Save
 } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { getTodaySessions, getDashboardStats, updateSession, updateSessionStatus, deleteSession } from '../services/sessionService';
-import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
+import { getPatients, updatePatient, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getTherapists, getTherapistColor } from '../services/therapistService';
 import { Session, Therapist, Patient, WORKING_HOURS } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -70,6 +72,9 @@ export function DashboardPage() {
   const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [editData, setEditData] = useState<Partial<Session>>({});
+  const [editingPackage, setEditingPackage] = useState(false);
+  const [packageData, setPackageData] = useState({ totalSessions: 0, usedSessions: 0 });
+  const [savingPackage, setSavingPackage] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -97,6 +102,7 @@ export function DashboardPage() {
   const openViewModal = (session: Session) => {
     setModalMode('view');
     setSelectedSession(session);
+    setEditingPackage(false);
     setIsModalOpen(true);
   };
 
@@ -176,6 +182,23 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error deleting session:', error);
     }
+  };
+
+  const handleSavePackage = async () => {
+    if (!selectedSession) return;
+    setSavingPackage(true);
+    try {
+      await updatePatient(selectedSession.patientId, {
+        totalSessions: packageData.totalSessions,
+        usedSessions: packageData.usedSessions,
+      });
+      setEditingPackage(false);
+      loadData();
+    } catch (error) {
+      console.error('Error updating package:', error);
+      alert('Błąd podczas zapisu pakietu');
+    }
+    setSavingPackage(false);
   };
 
   const today = new Date();
@@ -580,6 +603,115 @@ export function DashboardPage() {
                       );
                     })()}
                   </div>
+
+                  {/* Session package info */}
+                  {isAdmin && (() => {
+                    const sessionPatient = patients.find(p => p.id === selectedSession.patientId);
+                    if (!sessionPatient) return null;
+                    const remaining = (editingPackage ? packageData.totalSessions : sessionPatient.totalSessions) - (editingPackage ? packageData.usedSessions : sessionPatient.usedSessions);
+                    return (
+                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Sesje w pakiecie</p>
+                          {!editingPackage ? (
+                            <button
+                              onClick={() => {
+                                setEditingPackage(true);
+                                setPackageData({
+                                  totalSessions: sessionPatient.totalSessions,
+                                  usedSessions: sessionPatient.usedSessions,
+                                });
+                              }}
+                              className="text-[10px] font-medium text-emerald-600 hover:text-emerald-800 transition-colors"
+                            >
+                              Edytuj
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setEditingPackage(false)}
+                              className="text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                              Anuluj
+                            </button>
+                          )}
+                        </div>
+                        {editingPackage ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-slate-600">Łącznie:</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => setPackageData(prev => ({ ...prev, totalSessions: Math.max(1, prev.totalSessions - 1) }))}
+                                  className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <input
+                                  type="number"
+                                  value={packageData.totalSessions}
+                                  onChange={(e) => setPackageData(prev => ({ ...prev, totalSessions: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                  className="w-14 text-center text-sm font-semibold bg-white border border-slate-200 rounded-lg py-1"
+                                />
+                                <button
+                                  onClick={() => setPackageData(prev => ({ ...prev, totalSessions: prev.totalSessions + 1 }))}
+                                  className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-slate-600">Wykorzystane:</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => setPackageData(prev => ({ ...prev, usedSessions: Math.max(0, prev.usedSessions - 1) }))}
+                                  className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <input
+                                  type="number"
+                                  value={packageData.usedSessions}
+                                  onChange={(e) => setPackageData(prev => ({ ...prev, usedSessions: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                  className="w-14 text-center text-sm font-semibold bg-white border border-slate-200 rounded-lg py-1"
+                                />
+                                <button
+                                  onClick={() => setPackageData(prev => ({ ...prev, usedSessions: prev.usedSessions + 1 }))}
+                                  className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-emerald-200">
+                              <span className="text-xs font-medium text-emerald-700">Pozostałe: {packageData.totalSessions - packageData.usedSessions}</span>
+                              <button
+                                onClick={handleSavePackage}
+                                disabled={savingPackage}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                              >
+                                <Save size={12} />
+                                {savingPackage ? 'Zapisuję...' : 'Zapisz'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 text-sm">
+                              <span className="text-emerald-700 font-medium">{sessionPatient.usedSessions} / {sessionPatient.totalSessions}</span>
+                              <span className="text-emerald-500 text-xs">({remaining} pozostałe)</span>
+                            </div>
+                            {remaining <= 3 && remaining > 0 && (
+                              <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Kończy się!</span>
+                            )}
+                            {remaining <= 0 && (
+                              <span className="text-[10px] font-medium text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">Wyczerpane!</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Admin actions */}
                   {isAdmin && (
