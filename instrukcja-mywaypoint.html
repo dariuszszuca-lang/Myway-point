@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>MyWay Point — Instrukcja korzystania z systemu rezerwacji</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #1e293b;
+    line-height: 1.6;
+    font-size: 11pt;
+  }
+
+  .page {
+    page-break-after: always;
+    padding: 50px 55px;
+    min-height: 100vh;
+  }
+  .page:last-child { page-break-after: avoid; }
+
+  /* Cover page */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+    color: white;
+    position: relative;
+  }
+  .cover-logo {
+    font-size: 42pt;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+  .cover-logo span { color: #fbbf24; }
+  .cover-subtitle {
+    font-size: 18pt;
+    font-weight: 400;
+    color: #94a3b8;
+    margin-bottom: 50px;
+  }
+  .cover-title {
+    font-size: 28pt;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 15px;
+    max-width: 500px;
+  }
+  .cover-desc {
+    font-size: 13pt;
+    color: #cbd5e1;
+    max-width: 400px;
+  }
+  .cover-footer {
+    position: absolute;
+    bottom: 50px;
+    font-size: 10pt;
+    color: #64748b;
+  }
+
+  /* Section headers */
+  .section-header {
+    background: #0f172a;
+    color: white;
+    padding: 14px 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-header .icon {
+    width: 36px; height: 36px;
+    background: #fbbf24;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18pt;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 16pt;
+    font-weight: 700;
+  }
+  .section-header p {
+    font-size: 10pt;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+
+  /* Steps */
+  .step {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 22px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 34px; height: 34px;
+    background: #0f172a;
+    color: #fbbf24;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 14pt;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-content { flex: 1; }
+  .step-content h3 {
+    font-size: 12pt;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #0f172a;
+  }
+  .step-content p {
+    color: #475569;
+    font-size: 10.5pt;
+  }
+
+  /* Info boxes */
+  .info-box {
+    background: #f0f9ff;
+    border-left: 4px solid #0ea5e9;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+  }
+  .info-box.warning {
+    background: #fefce8;
+    border-left-color: #eab308;
+  }
+  .info-box.success {
+    background: #f0fdf4;
+    border-left-color: #22c55e;
+  }
+  .info-box strong {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 10.5pt;
+  }
+  .info-box p {
+    font-size: 10pt;
+    color: #475569;
+  }
+
+  /* Table of contents */
+  .toc {
+    margin: 30px 0;
+  }
+  .toc-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 11pt;
+  }
+  .toc-item:nth-child(odd) { background: #f8fafc; }
+  .toc-item .label { font-weight: 600; }
+  .toc-item .page-num {
+    color: #64748b;
+    font-size: 10pt;
+  }
+  .toc-section {
+    padding: 8px 15px;
+    background: #0f172a;
+    color: #fbbf24;
+    font-weight: 700;
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 15px;
+  }
+  .toc-section:first-child { margin-top: 0; }
+
+  /* Subsection */
+  .subsection {
+    margin-bottom: 30px;
+  }
+  .subsection h3 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  /* Schedule table */
+  .schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 10pt;
+  }
+  .schedule-table th {
+    background: #0f172a;
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+  }
+  .schedule-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .schedule-table tr:nth-child(even) td { background: #f8fafc; }
+
+  /* Contact footer */
+  .contact-footer {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 30px;
+    text-align: center;
+  }
+  .contact-footer h4 {
+    font-size: 12pt;
+    margin-bottom: 8px;
+  }
+  .contact-footer p {
+    font-size: 10pt;
+    color: #475569;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 600;
+  }
+  .badge-patient { background: #dbeafe; color: #1d4ed8; }
+  .badge-therapist { background: #fae8ff; color: #9333ea; }
+  .badge-admin { background: #fef3c7; color: #b45309; }
+
+  /* Columns */
+  .two-cols {
+    display: flex;
+    gap: 20px;
+  }
+  .two-cols > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="page cover">
+  <div class="cover-logo">MyWay <span>Point</span></div>
+  <div class="cover-subtitle">System Rezerwacji Konsultacji</div>
+  <div class="cover-title">Instrukcja korzystania z platformy</div>
+  <div class="cover-desc">Przewodnik krok po kroku dla pacjentów i terapeutów</div>
+  <div class="cover-footer">
+    mywaypoint.pl &nbsp;|&nbsp; Ośrodek MyWay &nbsp;|&nbsp; Luty 2026
+  </div>
+</div>
+
+<!-- ==================== TABLE OF CONTENTS ==================== -->
+<div class="page">
+  <div class="section-header">
+    <div class="icon">📋</div>
+    <div>
+      <h2>Spis treści</h2>
+      <p>Co znajdziesz w tej instrukcji</p>
+    </div>
+  </div>
+
+  <div class="toc">
+    <div class="toc-section">Część I — Dla pacjentów</div>
+    <div class="toc-item"><span class="label">1. Jak się zalogować</span><span class="page-num">str. 3</span></div>
+    <div class="toc-item"><span class="label">2. Panel główny (Dashboard)</span><span class="page-num">str. 3</span></div>
+    <div class="toc-item"><span class="label">3. Jak zarezerwować konsultację</span><span class="page-num">str. 4</span></div>
+    <div class="toc-item"><span class="label">4. Jak odwołać konsultację</span><span class="page-num">str. 4</span></div>
+    <div class="toc-item"><span class="label">5. Najczęstsze pytania (FAQ)</span><span class="page-num">str. 5</span></div>
+
+    <div class="toc-section">Część II — Dla terapeutów</div>
+    <div class="toc-item"><span class="label">6. Logowanie i rola admina</span><span class="page-num">str. 6</span></div>
+    <div class="toc-item"><span class="label">7. Panel główny — widok terapeuty</span><span class="page-num">str. 6</span></div>
+    <div class="toc-item"><span class="label">8. Kalendarz i zarządzanie sesjami</span><span class="page-num">str. 7</span></div>
+    <div class="toc-item"><span class="label">9. Zarządzanie pacjentami</span><span class="page-num">str. 7</span></div>
+    <div class="toc-item"><span class="label">10. Ustawienia — dostępność i grafik</span><span class="page-num">str. 8</span></div>
+    <div class="toc-item"><span class="label">11. Powiadomienia e-mail</span><span class="page-num">str. 8</span></div>
+
+    <div class="toc-section">Dodatki</div>
+    <div class="toc-item"><span class="label">Grafik terapeutów</span><span class="page-num">str. 9</span></div>
+    <div class="toc-item"><span class="label">Dane kontaktowe i pomoc</span><span class="page-num">str. 9</span></div>
+  </div>
+
+  <div class="info-box">
+    <strong>Adres platformy</strong>
+    <p><strong>mywaypoint.pl</strong> — otwórz w przeglądarce na komputerze lub telefonie. Logowanie przez konto Google.</p>
+  </div>
+</div>
+
+<!-- ==================== PATIENT SECTION ==================== -->
+<div class="page">
+  <div class="section-header">
+    <div class="icon">👤</div>
+    <div>
+      <h2>Część I — Instrukcja dla pacjentów</h2>
+      <p>Rejestracja, rezerwacja i odwoływanie konsultacji</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>1. Jak się zalogować</h3>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Otwórz stronę</h3>
+        <p>Wejdź na <strong>mywaypoint.pl</strong> w przeglądarce (Chrome, Safari, Firefox) na komputerze lub telefonie.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Kliknij „Zaloguj się przez Google"</h3>
+        <p>Na ekranie logowania zobaczysz przycisk z logo Google. Kliknij go.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Wybierz swoje konto Google</h3>
+        <p>Użyj <strong>tego samego adresu e-mail</strong>, który podałeś/aś przy rejestracji w ośrodku MyWay. System automatycznie rozpozna Twoje konto pacjenta.</p>
+      </div>
+    </div>
+
+    <div class="info-box warning">
+      <strong>Ważne!</strong>
+      <p>Jeśli logujesz się innym adresem e-mail niż ten podany w ośrodku, system nie połączy Cię z Twoim kontem pacjenta. W takim przypadku skontaktuj się z recepcją.</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>2. Panel główny (Dashboard)</h3>
+    <p>Po zalogowaniu zobaczysz swój panel z najważniejszymi informacjami:</p>
+
+    <div class="two-cols" style="margin-top: 15px;">
+      <div class="info-box success" style="margin: 0;">
+        <strong>Nadchodzące konsultacje</strong>
+        <p>Lista Twoich zarezerwowanych sesji z datą, godziną i nazwiskiem terapeuty.</p>
+      </div>
+      <div class="info-box" style="margin: 0;">
+        <strong>Wykorzystane sesje</strong>
+        <p>Licznik pokazujący ile sesji wykorzystałeś z przydzielonej puli (np. 3 z 20).</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== BOOKING ==================== -->
+<div class="page">
+  <div class="subsection">
+    <h3>3. Jak zarezerwować konsultację</h3>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Przejdź do zakładki „Kalendarz"</h3>
+        <p>W menu bocznym (lub na górze na telefonie) kliknij ikonę kalendarza.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Wybierz terapeutę</h3>
+        <p>U góry strony zobaczysz listę terapeutów. Kliknij nazwisko terapeuty, u którego chcesz zarezerwować konsultację.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Wybierz dzień</h3>
+        <p>Kalendarz pokazuje widok tygodniowy. Kliknij dzień, w którym terapeuta ma dostępność. Dostępne godziny będą podświetlone.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h3>Wybierz godzinę</h3>
+        <p>Kliknij wolny slot czasowy (podświetlony na zielono). Zajęte terminy są wyszarzone.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <h3>Potwierdź rezerwację</h3>
+        <p>Pojawi się okno potwierdzenia z podsumowaniem — datą, godziną i terapeutą. Kliknij <strong>„Zarezerwuj"</strong>.</p>
+      </div>
+    </div>
+
+    <div class="info-box success">
+      <strong>Gotowe!</strong>
+      <p>Twoja konsultacja jest zarezerwowana. Terapeuta otrzyma powiadomienie e-mail. Konsultacja pojawi się też na Twoim Dashboardzie.</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>4. Jak odwołać konsultację</h3>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Otwórz Dashboard</h3>
+        <p>Na stronie głównej (po zalogowaniu) zobaczysz listę nadchodzących konsultacji.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Kliknij „Odwołaj"</h3>
+        <p>Przy każdej zarezerwowanej konsultacji jest przycisk <strong>„Odwołaj"</strong>. Kliknij go.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Potwierdź odwołanie</h3>
+        <p>System poprosi o potwierdzenie. Po zatwierdzeniu termin wraca do puli i inny pacjent może go zarezerwować.</p>
+      </div>
+    </div>
+
+    <div class="info-box warning">
+      <strong>Prosimy o odwoływanie z wyprzedzeniem</strong>
+      <p>Jeśli wiesz, że nie dasz rady przyjść — odwołaj konsultację jak najwcześniej. Dzięki temu ktoś inny może skorzystać z tego terminu.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== FAQ ==================== -->
+<div class="page">
+  <div class="subsection">
+    <h3>5. Najczęstsze pytania — pacjenci</h3>
+
+    <div class="info-box" style="margin-bottom: 12px;">
+      <strong>Nie mogę się zalogować — co robić?</strong>
+      <p>Upewnij się, że używasz tego samego adresu e-mail co przy rejestracji w ośrodku. Jeśli nadal nie działa — napisz na <strong>terapia@osrodek-myway.pl</strong>.</p>
+    </div>
+
+    <div class="info-box" style="margin-bottom: 12px;">
+      <strong>Nie widzę wolnych terminów</strong>
+      <p>Każdy terapeuta ma określone dni i godziny przyjęć. Jeśli w danym tygodniu nie ma wolnych terminów, sprawdź kolejny tydzień klikając strzałkę w prawo na kalendarzu.</p>
+    </div>
+
+    <div class="info-box" style="margin-bottom: 12px;">
+      <strong>Ile konsultacji mi przysługuje?</strong>
+      <p>Liczba konsultacji zależy od Twojego pakietu terapii. Pakiet 3 daje 20 konsultacji online. Aktualny stan widzisz na Dashboardzie.</p>
+    </div>
+
+    <div class="info-box" style="margin-bottom: 12px;">
+      <strong>Czy mogę rezerwować u kilku terapeutów?</strong>
+      <p>Tak, możesz rezerwować konsultacje u dowolnego dostępnego terapeuty. Wystarczy wybrać go na kalendarzu.</p>
+    </div>
+
+    <div class="info-box" style="margin-bottom: 12px;">
+      <strong>Jak odbywa się konsultacja online?</strong>
+      <p>Szczegóły dotyczące formy konsultacji (wideo, telefon) ustala terapeuta. Dane kontaktowe i link do spotkania otrzymasz od terapeuty.</p>
+    </div>
+  </div>
+
+  <div style="height: 30px;"></div>
+
+  <!-- ==================== THERAPIST SECTION HEADER ==================== -->
+  <div class="section-header">
+    <div class="icon">🩺</div>
+    <div>
+      <h2>Część II — Instrukcja dla terapeutów</h2>
+      <p>Zarządzanie grafikiem, sesjami i pacjentami</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>6. Logowanie i rola admina</h3>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Zaloguj się na mywaypoint.pl</h3>
+        <p>Użyj przycisku „Zaloguj się przez Google" i wybierz swoje konto. Konta terapeutów mają <strong>uprawnienia administratora</strong> — automatycznie widzisz pełny panel zarządzania.</p>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>Konta z uprawnieniami admina:</strong>
+      <p>krystiannagaba@gmail.com, mywaymarcin@gmail.com, waldemarsikorski77@gmail.com, dariusz.szuca@gmail.com</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>7. Panel główny — widok terapeuty</h3>
+    <p>Jako admin widzisz rozszerzony Dashboard:</p>
+
+    <div class="two-cols" style="margin-top: 12px;">
+      <div>
+        <div class="info-box success" style="margin-bottom: 10px;">
+          <strong>Dzisiejsze sesje</strong>
+          <p>Wszystkie konsultacje zaplanowane na dziś — z godzinami i nazwiskami pacjentów.</p>
+        </div>
+        <div class="info-box" style="margin-bottom: 10px;">
+          <strong>Nadchodzące sesje</strong>
+          <p>Sesje zaplanowane na najbliższe dni, pogrupowane chronologicznie.</p>
+        </div>
+      </div>
+      <div>
+        <div class="info-box warning" style="margin-bottom: 10px;">
+          <strong>Statystyki</strong>
+          <p>Łączna liczba sesji, anulowanych, pacjentów — szybki przegląd aktywności.</p>
+        </div>
+        <div class="info-box success" style="margin-bottom: 10px;">
+          <strong>Zarządzanie</strong>
+          <p>Szybki dostęp do kalendarza, pacjentów i ustawień.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== THERAPIST - CALENDAR & PATIENTS ==================== -->
+<div class="page">
+  <div class="subsection">
+    <h3>8. Kalendarz i zarządzanie sesjami</h3>
+
+    <p style="margin-bottom: 15px;">Zakładka <strong>„Kalendarz"</strong> to główne narzędzie pracy terapeuty:</p>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Widok tygodnia</h3>
+        <p>Kalendarz pokazuje cały tydzień. Nawiguj strzałkami ← → między tygodniami. Kolorowe bloki to zarezerwowane sesje.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Tworzenie sesji (jako admin)</h3>
+        <p>Kliknij wolny slot w kalendarzu → wybierz pacjenta z listy → potwierdź. Jako admin możesz tworzyć sesje dla dowolnego pacjenta.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Zmiana statusu sesji</h3>
+        <p>Kliknij istniejącą sesję, aby zmienić jej status:</p>
+        <p style="margin-top: 5px;">
+          <span class="badge badge-patient">Zaplanowana</span> →
+          <span class="badge" style="background: #dcfce7; color: #166534;">Odbyta</span> /
+          <span class="badge" style="background: #fee2e2; color: #991b1b;">Odwołana</span> /
+          <span class="badge" style="background: #fef3c7; color: #92400e;">Nieobecność</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <h3>Usuwanie sesji</h3>
+        <p>Admin może usunąć dowolną sesję. Kliknij sesję → „Usuń". Uwaga: usunięcie jest nieodwracalne.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>9. Zarządzanie pacjentami</h3>
+
+    <p style="margin-bottom: 15px;">Zakładka <strong>„Pacjenci"</strong> (widoczna tylko dla adminów):</p>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Lista pacjentów</h3>
+        <p>Widok wszystkich pacjentów z danymi: imię, e-mail, telefon, liczba wykorzystanych/przydzielonych sesji.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Dodawanie pacjenta</h3>
+        <p>Kliknij <strong>„Dodaj pacjenta"</strong> → wpisz dane (imię, e-mail, telefon, liczbę sesji). Pacjent automatycznie pojawi się w systemie po zalogowaniu swoim e-mailem.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Edycja danych pacjenta</h3>
+        <p>Kliknij pacjenta na liście → zmień dane → zapisz. Możesz zwiększyć liczbę sesji, dodać notatki, zmienić dane kontaktowe.</p>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>Synchronizacja z MyWay CRM</strong>
+      <p>Pacjenci z Pakietem 3 dodani w CRM automatycznie pojawiają się w MyWay Point z pulą 20 konsultacji.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== THERAPIST - SETTINGS ==================== -->
+<div class="page">
+  <div class="subsection">
+    <h3>10. Ustawienia — dostępność i grafik</h3>
+
+    <p style="margin-bottom: 15px;">Zakładka <strong>„Ustawienia"</strong> pozwala zarządzać terapeutami i ich grafikiem:</p>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <h3>Lista terapeutów</h3>
+        <p>Zobaczysz wszystkich terapeutów z ich aktualnymi godzinami przyjęć.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <h3>Zmiana grafiku</h3>
+        <p>Przy każdym terapeucie możesz edytować dostępność: <strong>zmienić dzień tygodnia, godziny rozpoczęcia i zakończenia</strong>, lub tymczasowo wyłączyć termin (bez usuwania).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <h3>Dodawanie nowych terminów</h3>
+        <p>Kliknij „Dodaj termin" przy terapeucie → wybierz dzień tygodnia i godziny. Możesz dodać kilka terminów w różne dni.</p>
+      </div>
+    </div>
+
+    <div class="info-box warning">
+      <strong>Zmiana grafiku nie wpływa na istniejące rezerwacje</strong>
+      <p>Jeśli zmienisz dostępność, już zarezerwowane sesje pozostaną bez zmian. Nowe terminy będą obowiązywać od następnej dostępnej daty.</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>11. Powiadomienia e-mail</h3>
+
+    <p style="margin-bottom: 15px;">System automatycznie wysyła powiadomienia e-mail:</p>
+
+    <table class="schedule-table">
+      <tr>
+        <th>Zdarzenie</th>
+        <th>Odbiorca</th>
+        <th>Treść</th>
+      </tr>
+      <tr>
+        <td><strong>Nowa rezerwacja</strong></td>
+        <td>terapia@osrodek-myway.pl</td>
+        <td>Data, godzina, terapeuta, pacjent</td>
+      </tr>
+      <tr>
+        <td><strong>Potwierdzenie pacjenta</strong></td>
+        <td>Pacjent (e-mail)</td>
+        <td>Mail powitalny z informacjami o ośrodku</td>
+      </tr>
+      <tr>
+        <td><strong>Wypisanie pacjenta</strong></td>
+        <td>Pacjent (e-mail)</td>
+        <td>Mail pożegnalny z podziękowaniem</td>
+      </tr>
+    </table>
+
+    <div class="info-box success">
+      <strong>Powiadomienia działają automatycznie</strong>
+      <p>Nie musisz nic konfigurować. Każda nowa rezerwacja generuje e-mail na terapia@osrodek-myway.pl z pełnymi szczegółami sesji.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== APPENDIX ==================== -->
+<div class="page">
+  <div class="section-header">
+    <div class="icon">📎</div>
+    <div>
+      <h2>Dodatki</h2>
+      <p>Grafik terapeutów i dane kontaktowe</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <h3>Aktualny grafik terapeutów</h3>
+
+    <table class="schedule-table">
+      <tr>
+        <th>Terapeuta</th>
+        <th>Dzień</th>
+        <th>Godziny</th>
+        <th>Czas trwania sesji</th>
+      </tr>
+      <tr>
+        <td><strong>Krystian Nagaba</strong></td>
+        <td>Piątek</td>
+        <td>19:30 — 21:00</td>
+        <td>60 min</td>
+      </tr>
+      <tr>
+        <td rowspan="2"><strong>Waldemar Sikorski</strong></td>
+        <td>Środa</td>
+        <td>12:00 — 14:00</td>
+        <td>60 min</td>
+      </tr>
+      <tr>
+        <td>Czwartek, Piątek</td>
+        <td>07:00 — 11:00</td>
+        <td>60 min</td>
+      </tr>
+      <tr>
+        <td rowspan="2"><strong>Natalia Pucz</strong></td>
+        <td>Poniedziałek</td>
+        <td>18:30 — 19:30</td>
+        <td>60 min</td>
+      </tr>
+      <tr>
+        <td>Czwartek</td>
+        <td>16:30 — 17:30</td>
+        <td>60 min</td>
+      </tr>
+    </table>
+
+    <div class="info-box warning">
+      <strong>Grafik może ulec zmianie</strong>
+      <p>Aktualne terminy zawsze widoczne są w kalendarzu na mywaypoint.pl. Ten grafik jest aktualny na luty 2026.</p>
+    </div>
+  </div>
+
+  <div class="contact-footer">
+    <h4>Potrzebujesz pomocy?</h4>
+    <p style="margin-bottom: 8px;">Jeśli masz problem z systemem rezerwacji, skontaktuj się z nami:</p>
+    <p>
+      <strong>E-mail:</strong> terapia@osrodek-myway.pl<br>
+      <strong>Telefon:</strong> +48 731 395 295<br>
+      <strong>Strona:</strong> osrodek-myway.pl
+    </p>
+    <p style="margin-top: 15px; font-size: 9pt; color: #94a3b8;">
+      Ośrodek MyWay — Prywatny Ośrodek Terapii Uzależnień<br>
+      ul. Wichrowe Wzgórza 21, Kąpino 84-200
+    </p>
+  </div>
+</div>
+
+</body>
+</html>

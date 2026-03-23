@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from 'date-fns';
 import { pl } from 'date-fns/locale';
-import { BarChart3, Calendar, ChevronDown, TrendingUp, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { BarChart3, Calendar, ChevronDown, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { getSessionsByDateRange } from '../services/sessionService';
 import { getTherapists } from '../services/therapistService';
 import { Session, Therapist } from '../types';
