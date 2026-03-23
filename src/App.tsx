@@ -5,6 +5,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { TherapistsPage } from './pages/TherapistsPage';
+import { ReportsPage } from './pages/ReportsPage';
 import {
   Calendar as CalendarIcon,
   Users,
@@ -14,7 +15,8 @@ import {
   Search,
   Activity,
   LogOut,
-  User
+  User,
+  BarChart3
 } from 'lucide-react';
 import { signOut, getAuth } from 'firebase/auth';
 
@@ -50,6 +52,14 @@ export default function App() {
               element={
                 <AdminRoute>
                   <PatientsPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="reports"
+              element={
+                <AdminRoute>
+                  <ReportsPage />
                 </AdminRoute>
               }
             />
@@ -103,9 +113,14 @@ function MainLayout() {
             />
           )}
 
-          {/* Settings - admin only */}
+          {/* Reports + Settings - admin only */}
           {isAdmin && (
-            <div className="pt-4 mt-4 border-t border-slate-100">
+            <div className="pt-4 mt-4 border-t border-slate-100 space-y-2">
+              <NavItem
+                icon={<BarChart3 size={22} />}
+                label="Raporty"
+                to="/reports"
+              />
               <NavItem
                 icon={<Settings size={22} />}
                 label="Ustawienia"
