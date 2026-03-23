@@ -13,30 +13,31 @@ export function PatientModal({ isOpen, onClose, onSave, patientToEdit }: Patient
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [totalSessions, setTotalSessions] = useState(DEFAULT_SESSIONS_PACKAGE);
+  const [remainingSessions, setRemainingSessions] = useState(DEFAULT_SESSIONS_PACKAGE);
 
   useEffect(() => {
     if (patientToEdit) {
       setName(patientToEdit.name);
       setEmail(patientToEdit.email || '');
       setPhone(patientToEdit.phone || '');
-      setTotalSessions(patientToEdit.totalSessions);
+      setRemainingSessions(patientToEdit.totalSessions - patientToEdit.usedSessions);
     } else {
       setName('');
       setEmail('');
       setPhone('');
-      setTotalSessions(DEFAULT_SESSIONS_PACKAGE);
+      setRemainingSessions(DEFAULT_SESSIONS_PACKAGE);
     }
   }, [patientToEdit, isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const usedSessions = patientToEdit ? patientToEdit.usedSessions : 0;
     onSave({
         name,
         email: email.toLowerCase().trim() || undefined,
         phone: phone.trim() || undefined,
-        totalSessions: Number(totalSessions),
-        usedSessions: patientToEdit ? patientToEdit.usedSessions : 0,
+        totalSessions: Number(remainingSessions) + usedSessions,
+        usedSessions,
         sessionsHistory: patientToEdit ? patientToEdit.sessionsHistory : [],
         createdAt: patientToEdit ? patientToEdit.createdAt : Date.now(),
     });
@@ -90,12 +91,18 @@ export function PatientModal({ isOpen, onClose, onSave, patientToEdit }: Patient
               />
             </div>
             <div>
-              <label htmlFor="totalSessions" className="block text-sm font-medium text-slate-600 mb-2">Liczba sesji w pakiecie</label>
+              <label htmlFor="remainingSessions" className="block text-sm font-medium text-slate-600 mb-2">
+                Pozostało sesji
+                {patientToEdit && patientToEdit.usedSessions > 0 && (
+                  <span className="text-slate-400 font-normal ml-2">(wykorzystano: {patientToEdit.usedSessions})</span>
+                )}
+              </label>
               <input
-                id="totalSessions"
+                id="remainingSessions"
                 type="number"
-                value={totalSessions}
-                onChange={(e) => setTotalSessions(Number(e.target.value))}
+                min="0"
+                value={remainingSessions}
+                onChange={(e) => setRemainingSessions(Number(e.target.value))}
                 className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-myway-primary/50"
                 required
               />
