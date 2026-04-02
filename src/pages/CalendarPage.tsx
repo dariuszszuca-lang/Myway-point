@@ -17,7 +17,7 @@ import {
 import { getSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
-import { getAvailability, isTimeSlotAvailable, isTimeSlotAvailableWithOverrides } from '../services/availabilityService';
+import { getAvailability, isTimeSlotAvailableWithOverrides } from '../services/availabilityService';
 import { getOverrides, addOverride, updateOverride, deleteOverride } from '../services/overrideService';
 import { Session, Therapist, Patient, Availability, AvailabilityOverride, WORKING_HOURS, CreateSessionData } from '../types';
 import { useAuth } from '../context/AuthContext';
