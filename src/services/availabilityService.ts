@@ -1,6 +1,7 @@
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
-import { Availability } from '../types';
+import { Availability, AvailabilityOverride } from '../types';
+import { getOverrideForDate } from './overrideService';
 
 const availabilityCollectionRef = collection(db, 'availability');
 
@@ -82,9 +83,14 @@ export const initializeDefaultAvailability = async (therapistId: string, therapi
   }
 };
 
+// Convert time strings to minutes for comparison
+const toMinutes = (time: string): number => {
+  const [hours, mins] = time.split(':').map(Number);
+  return hours * 60 + mins;
+};
+
 // Check if a specific time slot is available for a therapist
 // Slot is available if its START time falls within the availability window
-// E.g., availability 08:00-13:00 means slots 08:00, 08:30, ..., 12:30, 13:00 are available
 export const isTimeSlotAvailable = (
   availability: Availability[],
   dayOfWeek: number,
@@ -95,12 +101,6 @@ export const isTimeSlotAvailable = (
 
   if (activeAvailability.length === 0) return false;
 
-  // Convert time strings to minutes for comparison
-  const toMinutes = (time: string): number => {
-    const [hours, mins] = time.split(':').map(Number);
-    return hours * 60 + mins;
-  };
-
   const requestedStart = toMinutes(startTime);
 
   // Check if requested slot START falls within any availability window (inclusive)
@@ -109,6 +109,38 @@ export const isTimeSlotAvailable = (
     const availEnd = toMinutes(a.endTime);
     return requestedStart >= availStart && requestedStart <= availEnd;
   });
+};
+
+// Check availability WITH overrides for a specific date
+// Override > default weekly schedule
+export const isTimeSlotAvailableWithOverrides = (
+  availability: Availability[],
+  overrides: AvailabilityOverride[],
+  therapistId: string,
+  date: string,
+  dayOfWeek: number,
+  startTime: string,
+  _endTime: string
+): boolean => {
+  // Sprawdź czy jest override na ten dzień
+  const override = getOverrideForDate(overrides, therapistId, date);
+
+  if (override) {
+    // Override typu 'unavailable' — terapeuta nie pracuje
+    if (override.type === 'unavailable') return false;
+
+    // Override typu 'custom' — inne godziny
+    if (override.type === 'custom' && override.startTime && override.endTime) {
+      const requestedStart = toMinutes(startTime);
+      const overrideStart = toMinutes(override.startTime);
+      const overrideEnd = toMinutes(override.endTime);
+      return requestedStart >= overrideStart && requestedStart <= overrideEnd;
+    }
+  }
+
+  // Brak override → domyślna dostępność tygodniowa
+  const therapistAvailability = availability.filter(a => a.therapistId === therapistId);
+  return isTimeSlotAvailable(therapistAvailability, dayOfWeek, startTime, _endTime);
 };
 
 // Get available time slots for a therapist on a specific date

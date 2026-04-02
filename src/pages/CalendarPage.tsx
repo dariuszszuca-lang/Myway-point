@@ -17,8 +17,9 @@ import {
 import { getSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
-import { getAvailability, isTimeSlotAvailable } from '../services/availabilityService';
-import { Session, Therapist, Patient, Availability, WORKING_HOURS, CreateSessionData } from '../types';
+import { getAvailability, isTimeSlotAvailable, isTimeSlotAvailableWithOverrides } from '../services/availabilityService';
+import { getOverrides, addOverride, updateOverride, deleteOverride } from '../services/overrideService';
+import { Session, Therapist, Patient, Availability, AvailabilityOverride, WORKING_HOURS, CreateSessionData } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
@@ -59,8 +60,19 @@ export function CalendarPage() {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
+  const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTherapist, setSelectedTherapist] = useState<string | 'all'>('all');
+
+  // Override modal state
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
+  const [overrideDate, setOverrideDate] = useState('');
+  const [overrideTherapistId, setOverrideTherapistId] = useState('');
+  const [overrideType, setOverrideType] = useState<'unavailable' | 'custom'>('unavailable');
+  const [overrideStartTime, setOverrideStartTime] = useState('09:00');
+  const [overrideEndTime, setOverrideEndTime] = useState('17:00');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [editingOverrideId, setEditingOverrideId] = useState<string | null>(null);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -90,9 +102,10 @@ export function CalendarPage() {
       }
 
       // Load data - different queries for admin vs patient
-      const [therapistsData, availabilityData] = await Promise.all([
+      const [therapistsData, availabilityData, overridesData] = await Promise.all([
         getTherapists(),
         getAvailability(),
+        getOverrides(),
       ]);
 
       // Sessions and patients - admin gets all, patient gets filtered
@@ -115,6 +128,7 @@ export function CalendarPage() {
       setTherapists(therapistsData);
       setPatients(patientsData);
       setAvailability(availabilityData);
+      setOverrides(overridesData);
     } catch (error) {
       console.error('Error loading calendar data:', error);
     }
@@ -137,13 +151,12 @@ export function CalendarPage() {
     });
   };
 
-  // Check if a therapist is available at a given time slot
-  // dayOfWeek: 0 = Sunday, 1 = Monday, etc. (JS Date.getDay() format)
+  // Check if a therapist is available at a given time slot (with overrides)
   const isTherapistAvailable = (date: Date, time: string, therapistId: string): boolean => {
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const therapistAvailability = availability.filter(a => a.therapistId === therapistId);
+    const dayOfWeek = date.getDay();
+    const dateStr = format(date, 'yyyy-MM-dd');
     const endTime = addMinutesToTime(time, WORKING_HOURS.slotDuration);
-    return isTimeSlotAvailable(therapistAvailability, dayOfWeek, time, endTime);
+    return isTimeSlotAvailableWithOverrides(availability, overrides, therapistId, dateStr, dayOfWeek, time, endTime);
   };
 
   // Check if any therapist is available at a given time slot
@@ -154,6 +167,65 @@ export function CalendarPage() {
   // Get available therapists for a specific slot
   const getAvailableTherapists = (date: Date, time: string): Therapist[] => {
     return therapists.filter(t => isTherapistAvailable(date, time, t.id));
+  };
+
+  // === OVERRIDE FUNCTIONS ===
+  const openOverrideModal = (date: Date, therapistId: string) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const existing = overrides.find(o => o.therapistId === therapistId && o.date === dateStr);
+
+    setOverrideDate(dateStr);
+    setOverrideTherapistId(therapistId);
+
+    if (existing) {
+      setOverrideType(existing.type);
+      setOverrideStartTime(existing.startTime || '09:00');
+      setOverrideEndTime(existing.endTime || '17:00');
+      setOverrideReason(existing.reason || '');
+      setEditingOverrideId(existing.id);
+    } else {
+      setOverrideType('unavailable');
+      setOverrideStartTime('09:00');
+      setOverrideEndTime('17:00');
+      setOverrideReason('');
+      setEditingOverrideId(null);
+    }
+
+    setIsOverrideModalOpen(true);
+  };
+
+  const saveOverride = async () => {
+    const data = {
+      therapistId: overrideTherapistId,
+      date: overrideDate,
+      type: overrideType as 'unavailable' | 'custom',
+      startTime: overrideType === 'custom' ? overrideStartTime : undefined,
+      endTime: overrideType === 'custom' ? overrideEndTime : undefined,
+      reason: overrideReason || undefined,
+    };
+
+    if (editingOverrideId) {
+      await updateOverride(editingOverrideId, data);
+    } else {
+      await addOverride(data);
+    }
+
+    setIsOverrideModalOpen(false);
+    await loadData();
+  };
+
+  const removeOverride = async () => {
+    if (editingOverrideId) {
+      await deleteOverride(editingOverrideId);
+      setIsOverrideModalOpen(false);
+      await loadData();
+    }
+  };
+
+  // Helper: check if a date has an override for a therapist
+  const getOverrideForDay = (date: Date, therapistId: string): AvailabilityOverride | undefined => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return overrides.find(o => o.therapistId === therapistId && o.date === dateStr);
   };
 
   const openNewSessionModal = (date: Date, time: string, therapistId?: string) => {
@@ -476,6 +548,34 @@ export function CalendarPage() {
                   <p className={`text-lg font-bold mt-1 ${isToday ? 'text-myway-primary' : 'text-slate-800'}`}>
                     {format(day, 'd')}
                   </p>
+                  {isAdmin && selectedTherapist !== 'all' && (
+                    <button
+                      onClick={() => openOverrideModal(day, selectedTherapist)}
+                      className="text-[10px] text-slate-400 hover:text-teal-600 mt-1 transition"
+                      title="Zmień dostępność tego dnia"
+                    >
+                      edytuj dzień
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <div className="flex gap-1 justify-center mt-1">
+                      {therapists.map(t => {
+                        const override = getOverrideForDay(day, t.id);
+                        return override ? (
+                          <button
+                            key={t.id}
+                            onClick={() => openOverrideModal(day, t.id)}
+                            title={`${t.name}: ${override.type === 'unavailable' ? 'Niedostępny' : 'Zmienione godziny'}${override.reason ? ` (${override.reason})` : ''}`}
+                            className={`w-3 h-3 rounded-full border ${
+                              override.type === 'unavailable'
+                                ? 'bg-red-400 border-red-500'
+                                : 'bg-blue-400 border-blue-500'
+                            }`}
+                          />
+                        ) : null;
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -952,6 +1052,107 @@ export function CalendarPage() {
                     Zamknij
                   </button>
                 </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERRIDE MODAL */}
+      {isOverrideModalOpen && isAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">
+                Zmień dostępność — {overrideDate}
+              </h3>
+              <button onClick={() => setIsOverrideModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="text-sm text-gray-500 mb-4">
+              {therapists.find(t => t.id === overrideTherapistId)?.name}
+            </div>
+
+            {/* Typ override */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Typ zmiany</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setOverrideType('unavailable')}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium border transition ${
+                    overrideType === 'unavailable'
+                      ? 'bg-red-50 border-red-300 text-red-700'
+                      : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Niedostępny
+                </button>
+                <button
+                  onClick={() => setOverrideType('custom')}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium border transition ${
+                    overrideType === 'custom'
+                      ? 'bg-blue-50 border-blue-300 text-blue-700'
+                      : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Inne godziny
+                </button>
+              </div>
+            </div>
+
+            {/* Godziny (tylko dla custom) */}
+            {overrideType === 'custom' && (
+              <div className="mb-4 flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-1">Od</label>
+                  <input
+                    type="time"
+                    value={overrideStartTime}
+                    onChange={(e) => setOverrideStartTime(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-1">Do</label>
+                  <input
+                    type="time"
+                    value={overrideEndTime}
+                    onChange={(e) => setOverrideEndTime(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Powód */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-1">Powód (opcjonalnie)</label>
+              <input
+                type="text"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="np. Urlop, Święto, Przesunięte godziny"
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={saveOverride}
+                className="flex-1 bg-teal-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition"
+              >
+                {editingOverrideId ? 'Zapisz zmiany' : 'Dodaj zmianę'}
+              </button>
+              {editingOverrideId && (
+                <button
+                  onClick={removeOverride}
+                  className="px-4 bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+                >
+                  Przywróć domyślne
+                </button>
               )}
             </div>
           </div>

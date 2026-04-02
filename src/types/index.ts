@@ -45,6 +45,21 @@ export interface Availability {
   isActive: boolean;
 }
 
+// Override dla konkretnej daty — nadpisuje domyślną dostępność tygodniową
+export type OverrideType = 'unavailable' | 'custom';
+
+export interface AvailabilityOverride {
+  id: string;
+  therapistId: string;
+  date: string; // YYYY-MM-DD — konkretna data
+  type: OverrideType;
+  // Jeśli type='unavailable' → terapeuta nie pracuje w tym dniu (startTime/endTime ignorowane)
+  // Jeśli type='custom' → terapeuta pracuje w innych godzinach niż domyślne
+  startTime?: string; // HH:mm (wymagane gdy type='custom')
+  endTime?: string; // HH:mm (wymagane gdy type='custom')
+  reason?: string; // np. "Święto", "Urlop", "Przesunięte godziny"
+}
+
 // For creating new sessions
 export interface CreateSessionData {
   patientId: string;
