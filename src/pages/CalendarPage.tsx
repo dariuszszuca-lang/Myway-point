@@ -102,11 +102,18 @@ export function CalendarPage() {
       }
 
       // Load data - different queries for admin vs patient
-      const [therapistsData, availabilityData, overridesData] = await Promise.all([
+      const [therapistsData, availabilityData] = await Promise.all([
         getTherapists(),
         getAvailability(),
-        getOverrides(),
       ]);
+
+      // Overrides — osobno z try/catch żeby nie blokować reszty danych
+      let overridesData: AvailabilityOverride[] = [];
+      try {
+        overridesData = await getOverrides();
+      } catch (e) {
+        console.warn('Nie udało się pobrać overrides (kolekcja może nie istnieć):', e);
+      }
 
       // Sessions and patients - admin gets all, patient gets filtered
       let sessionsData: Session[] = [];
