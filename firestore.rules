@@ -53,6 +53,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // AVAILABILITY_OVERRIDES - zmiany dostępności terapeutów (edytuj dzień)
+    match /availability_overrides/{overrideId} {
+      // Wszyscy zalogowani mogą czytać (potrzebne do kalendarza)
+      allow read: if isAuthenticated();
+      // Tylko admini mogą modyfikować
+      allow write: if isAdmin();
+    }
+
     // SESSIONS - sesje/rezerwacje
     // Walidacja dat (brak dat wstecz, 3 dni min dla pacjentów) — frontend-side
     // Firestore rules nie obsługują porównania stringów dat z request.time
