@@ -202,23 +202,34 @@ export function CalendarPage() {
   };
 
   const saveOverride = async () => {
-    const data = {
+    const data: Record<string, any> = {
       therapistId: overrideTherapistId,
       date: overrideDate,
       type: overrideType as 'unavailable' | 'custom',
-      startTime: overrideType === 'custom' ? overrideStartTime : undefined,
-      endTime: overrideType === 'custom' ? overrideEndTime : undefined,
-      reason: overrideReason || undefined,
     };
 
-    if (editingOverrideId) {
-      await updateOverride(editingOverrideId, data);
-    } else {
-      await addOverride(data);
+    if (overrideType === 'custom') {
+      data.startTime = overrideStartTime;
+      data.endTime = overrideEndTime;
     }
 
-    setIsOverrideModalOpen(false);
-    await loadData();
+    if (overrideReason) {
+      data.reason = overrideReason;
+    }
+
+    try {
+      if (editingOverrideId) {
+        await updateOverride(editingOverrideId, data);
+      } else {
+        await addOverride(data as any);
+      }
+
+      setIsOverrideModalOpen(false);
+      await loadData();
+    } catch (error) {
+      console.error('Błąd zapisu zmiany dostępności:', error);
+      alert('Nie udało się zapisać zmiany. Spróbuj ponownie.');
+    }
   };
 
   const removeOverride = async () => {
