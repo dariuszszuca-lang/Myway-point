@@ -14,7 +14,7 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-import { getSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek } from '../services/sessionService';
+import { getSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek, isTimeSlotAvailable } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailableWithOverrides } from '../services/availabilityService';
@@ -312,6 +312,23 @@ export function CalendarPage() {
       return;
     }
 
+    // Check if therapist already has a session at this time (prevent double-booking)
+    try {
+      const slotAvailable = await isTimeSlotAvailable(
+        newSessionData.therapistId!,
+        newSessionData.date!,
+        newSessionData.startTime!,
+        newSessionData.endTime!,
+        selectedSession.id
+      );
+      if (!slotAvailable) {
+        alert('Ten terapeuta ma już zarezerwowaną sesję o tej godzinie. Wybierz inny termin.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking time slot availability:', error);
+    }
+
     try {
       await updateSession(selectedSession.id, {
         date: newSessionData.date,
@@ -392,6 +409,22 @@ export function CalendarPage() {
       }
     } catch (error) {
       console.error('Error checking weekly limit:', error);
+    }
+
+    // Check if therapist already has a session at this time (prevent double-booking)
+    try {
+      const slotAvailable = await isTimeSlotAvailable(
+        newSessionData.therapistId!,
+        newSessionData.date!,
+        newSessionData.startTime!,
+        newSessionData.endTime!
+      );
+      if (!slotAvailable) {
+        alert('Ten terapeuta ma już zarezerwowaną sesję o tej godzinie. Wybierz inny termin.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking time slot availability:', error);
     }
 
     try {
