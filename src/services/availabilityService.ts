@@ -1,7 +1,6 @@
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
 import { Availability, AvailabilityOverride } from '../types';
-import { getOverrideForDate } from './overrideService';
 
 const availabilityCollectionRef = collection(db, 'availability');
 
@@ -113,6 +112,7 @@ export const isTimeSlotAvailable = (
 
 // Check availability WITH overrides for a specific date
 // Override > default weekly schedule
+// Obsługuje wiele override'ów na ten sam dzień (np. 12-14 i 17-20 z przerwą)
 export const isTimeSlotAvailableWithOverrides = (
   availability: Availability[],
   overrides: AvailabilityOverride[],
@@ -122,20 +122,22 @@ export const isTimeSlotAvailableWithOverrides = (
   startTime: string,
   _endTime: string
 ): boolean => {
-  // Sprawdź czy jest override na ten dzień
-  const override = getOverrideForDate(overrides, therapistId, date);
+  const dayOverrides = overrides.filter(o => o.therapistId === therapistId && o.date === date);
 
-  if (override) {
-    // Override typu 'unavailable' — terapeuta nie pracuje
-    if (override.type === 'unavailable') return false;
+  if (dayOverrides.length > 0) {
+    // Jeśli choć jeden override 'unavailable' → terapeuta nie pracuje tego dnia
+    if (dayOverrides.some(o => o.type === 'unavailable')) return false;
 
-    // Override typu 'custom' — inne godziny
-    if (override.type === 'custom' && override.startTime && override.endTime) {
-      const requestedStart = toMinutes(startTime);
-      const overrideStart = toMinutes(override.startTime);
-      const overrideEnd = toMinutes(override.endTime);
-      return requestedStart >= overrideStart && requestedStart <= overrideEnd;
-    }
+    // Custom overrides — slot dostępny jeśli pasuje do KTÓREGOKOLWIEK zakresu
+    const requestedStart = toMinutes(startTime);
+    return dayOverrides.some(o => {
+      if (o.type === 'custom' && o.startTime && o.endTime) {
+        const overrideStart = toMinutes(o.startTime);
+        const overrideEnd = toMinutes(o.endTime);
+        return requestedStart >= overrideStart && requestedStart <= overrideEnd;
+      }
+      return false;
+    });
   }
 
   // Brak override → domyślna dostępność tygodniowa
