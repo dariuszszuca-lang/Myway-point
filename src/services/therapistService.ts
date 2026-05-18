@@ -43,13 +43,8 @@ export const ensureTherapistsExist = async (): Promise<void> => {
   const data = await getDocs(therapistsCollectionRef);
   const therapists = data.docs.map(doc => doc.data());
 
-  // Check if we have the correct 3 therapists
-  const expectedNames = ['Krystian Nagaba', 'Natalia Pucz', 'Waldemar Sikorski'];
-  const currentNames = therapists.map(t => t.name);
-
-  const hasAllTherapists = expectedNames.every(name => currentNames.includes(name));
-
-  if (!hasAllTherapists || therapists.length === 0) {
+  // Init only when database is empty. Admin manages the list manually after that.
+  if (therapists.length === 0) {
     await resetTherapistsToDefault();
   }
 };
