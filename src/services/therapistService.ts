@@ -27,6 +27,22 @@ export const initializeDefaultTherapists = async (): Promise<void> => {
   }
 };
 
+export const ensureDefaultTherapistsExist = async (): Promise<void> => {
+  const existingTherapists = await getDocs(therapistsCollectionRef);
+  const existingNames = new Set(
+    existingTherapists.docs.map(doc => String(doc.data().name || '').trim().toLowerCase())
+  );
+
+  for (const therapist of DEFAULT_THERAPISTS) {
+    const normalizedName = therapist.name.trim().toLowerCase();
+    if (!existingNames.has(normalizedName)) {
+      const docRef = await addDoc(therapistsCollectionRef, therapist);
+      await initializeDefaultAvailability(docRef.id, therapist.name);
+      existingNames.add(normalizedName);
+    }
+  }
+};
+
 // Reset and reinitialize therapists with defaults
 export const resetTherapistsToDefault = async (): Promise<void> => {
   // Delete all existing therapists
@@ -46,7 +62,10 @@ export const ensureTherapistsExist = async (): Promise<void> => {
   // Init only when database is empty. Admin manages the list manually after that.
   if (therapists.length === 0) {
     await resetTherapistsToDefault();
+    return;
   }
+
+  await ensureDefaultTherapistsExist();
 };
 
 export const addTherapist = async (therapistData: Omit<Therapist, 'id'>): Promise<Therapist> => {

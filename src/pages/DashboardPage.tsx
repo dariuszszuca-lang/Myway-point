@@ -23,7 +23,7 @@ import {
 import { parseISO } from 'date-fns';
 import { getTodaySessions, getDashboardStats, updateSession, updateSessionStatus, deleteSession } from '../services/sessionService';
 import { getPatients, updatePatient, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
-import { getTherapists, getTherapistColor } from '../services/therapistService';
+import { ensureDefaultTherapistsExist, getTherapists, getTherapistColor } from '../services/therapistService';
 import { Session, Therapist, Patient, WORKING_HOURS } from '../types';
 import { useAuth } from '../context/AuthContext';
 
@@ -82,6 +82,10 @@ export function DashboardPage() {
 
   const loadData = async () => {
     try {
+      if (isAdmin) {
+        await ensureDefaultTherapistsExist();
+      }
+
       const [sessionsData, therapistsData, patientsData, statsData] = await Promise.all([
         getTodaySessions(),
         getTherapists(),
