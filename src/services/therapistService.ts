@@ -1,9 +1,26 @@
 import { db } from '../firebaseConfig';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy, where } from 'firebase/firestore';
 import { Therapist, DEFAULT_THERAPISTS } from '../types';
 import { initializeDefaultAvailability, deleteAvailabilityByTherapist, getAvailabilityByTherapist } from './availabilityService';
 
 const therapistsCollectionRef = collection(db, 'therapists');
+const overridesCollectionRef = collection(db, 'availability_overrides');
+
+const BOGDAN_AVAILABILITY_OVERRIDES = [
+  { date: '2026-05-11', startTime: '12:00', endTime: '14:00' },
+  { date: '2026-05-11', startTime: '17:00', endTime: '20:00' },
+  { date: '2026-05-12', startTime: '10:00', endTime: '15:00' },
+  { date: '2026-05-13', startTime: '10:00', endTime: '13:00' },
+  { date: '2026-05-13', startTime: '17:00', endTime: '20:00' },
+  { date: '2026-05-14', startTime: '12:00', endTime: '16:00' },
+  { date: '2026-05-15', startTime: '10:00', endTime: '15:00' },
+  { date: '2026-05-26', startTime: '10:00', endTime: '15:00' },
+  { date: '2026-05-27', startTime: '10:00', endTime: '15:00' },
+  { date: '2026-05-27', startTime: '17:00', endTime: '20:00' },
+  { date: '2026-05-28', startTime: '12:00', endTime: '16:00' },
+  { date: '2026-05-29', startTime: '10:00', endTime: '15:00' },
+  { date: '2026-05-29', startTime: '17:00', endTime: '20:00' },
+];
 
 export const getTherapists = async (): Promise<Therapist[]> => {
   const q = query(therapistsCollectionRef, orderBy('name', 'asc'));
@@ -24,21 +41,58 @@ export const initializeDefaultTherapists = async (): Promise<void> => {
     const docRef = await addDoc(therapistsCollectionRef, therapist);
     // Initialize default availability for this therapist
     await initializeDefaultAvailability(docRef.id, therapist.name);
+    if (therapist.name.includes('Bogdan')) {
+      await ensureBogdanAvailabilityOverrides(docRef.id);
+    }
+  }
+};
+
+export const ensureBogdanAvailabilityOverrides = async (therapistId: string): Promise<void> => {
+  const existingOverridesSnap = await getDocs(
+    query(overridesCollectionRef, where('therapistId', '==', therapistId))
+  );
+  const existingKeys = new Set(
+    existingOverridesSnap.docs.map(doc => {
+      const data = doc.data();
+      return `${data.date}|${data.startTime}|${data.endTime}|${data.type}`;
+    })
+  );
+
+  for (const slot of BOGDAN_AVAILABILITY_OVERRIDES) {
+    const key = `${slot.date}|${slot.startTime}|${slot.endTime}|custom`;
+    if (!existingKeys.has(key)) {
+      await addDoc(overridesCollectionRef, {
+        therapistId,
+        date: slot.date,
+        type: 'custom',
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        reason: 'Dyspozycja Bogdana - maj 2026',
+      });
+      existingKeys.add(key);
+    }
   }
 };
 
 export const ensureDefaultTherapistsExist = async (): Promise<void> => {
   const existingTherapists = await getDocs(therapistsCollectionRef);
-  const existingNames = new Set(
-    existingTherapists.docs.map(doc => String(doc.data().name || '').trim().toLowerCase())
+  const existingByName = new Map(
+    existingTherapists.docs.map(doc => [String(doc.data().name || '').trim().toLowerCase(), doc.id])
   );
 
   for (const therapist of DEFAULT_THERAPISTS) {
     const normalizedName = therapist.name.trim().toLowerCase();
-    if (!existingNames.has(normalizedName)) {
+    let therapistId = existingByName.get(normalizedName);
+
+    if (!therapistId) {
       const docRef = await addDoc(therapistsCollectionRef, therapist);
       await initializeDefaultAvailability(docRef.id, therapist.name);
-      existingNames.add(normalizedName);
+      therapistId = docRef.id;
+      existingByName.set(normalizedName, therapistId);
+    }
+
+    if (therapist.name.includes('Bogdan')) {
+      await ensureBogdanAvailabilityOverrides(therapistId);
     }
   }
 };
