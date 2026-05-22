@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { getTherapists, addTherapist, deleteTherapist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getAvailabilityByTherapist, addAvailability, deleteAvailability, updateAvailability, DAY_NAMES } from '../services/availabilityService';
-import { Therapist, Availability } from '../types';
-import { Plus, Clock, Trash2, Check, X } from 'lucide-react';
+import { getOverridesByTherapist } from '../services/overrideService';
+import { Therapist, Availability, AvailabilityOverride } from '../types';
+import { Plus, Clock, Trash2, Check, X, Calendar } from 'lucide-react';
 
 interface TherapistWithAvailability extends Therapist {
     availability: Availability[];
+    overrides: AvailabilityOverride[];
 }
 
 export function TherapistsPage() {
@@ -26,8 +28,11 @@ export function TherapistsPage() {
         const fetched = await getTherapists();
         const withAvailability = await Promise.all(
             fetched.map(async (therapist) => {
-                const availability = await getAvailabilityByTherapist(therapist.id);
-                return { ...therapist, availability };
+                const [availability, overrides] = await Promise.all([
+                    getAvailabilityByTherapist(therapist.id),
+                    getOverridesByTherapist(therapist.id),
+                ]);
+                return { ...therapist, availability, overrides };
             })
         );
         setTherapists(withAvailability);
@@ -248,6 +253,57 @@ export function TherapistsPage() {
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Date-specific Availability Overrides */}
+                    <div className="px-6 pb-6">
+                        <div className="flex items-center justify-between mb-4 pt-2">
+                            <h4 className="font-semibold text-slate-700 flex items-center gap-2">
+                                <Calendar size={18} className="text-blue-600" />
+                                Dostępność jednorazowa
+                            </h4>
+                            <span className="text-xs font-medium text-slate-400">
+                                {therapist.overrides.length} wpisów
+                            </span>
+                        </div>
+
+                        {therapist.overrides.length === 0 ? (
+                            <p className="text-sm text-slate-400 italic">Brak jednorazowych zmian dostępności</p>
+                        ) : (
+                            <div className="grid gap-2 md:grid-cols-2">
+                                {therapist.overrides
+                                    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime || ''))
+                                    .map(override => (
+                                        <div
+                                            key={override.id}
+                                            className={`flex items-center justify-between p-3 rounded-lg border ${
+                                                override.type === 'unavailable'
+                                                    ? 'bg-rose-50 border-rose-100'
+                                                    : 'bg-blue-50 border-blue-100'
+                                            }`}
+                                        >
+                                            <div>
+                                                <p className="font-medium text-slate-700">
+                                                    {override.date.split('-').reverse().join('.')}
+                                                </p>
+                                                <p className={`text-sm ${
+                                                    override.type === 'unavailable' ? 'text-rose-600' : 'text-blue-700'
+                                                }`}>
+                                                    {override.type === 'unavailable'
+                                                        ? 'Niedostępny'
+                                                        : `${override.startTime} - ${override.endTime}`}
+                                                </p>
+                                            </div>
+                                            {override.reason && (
+                                                <span className="text-xs text-slate-400 text-right max-w-[160px] truncate">
+                                                    {override.reason}
+                                                </span>
+                                            )}
                                         </div>
                                     ))
                                 }
