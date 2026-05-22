@@ -7,19 +7,20 @@ const availabilityCollectionRef = collection(db, 'availability');
 // Day names in Polish
 export const DAY_NAMES = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 
-// Default availability schedules for MyWay therapists
+// Default availability schedules for MyWay therapists.
+// Natalia stays in the system, but her default slots are inactive.
 export const DEFAULT_AVAILABILITY: Omit<Availability, 'id'>[] = [
   // Krystian - Friday 19:30-21:00
   { therapistId: '', dayOfWeek: 5, startTime: '19:30', endTime: '21:00', isActive: true },
+
+  // Natalia - availability disabled
+  { therapistId: '', dayOfWeek: 1, startTime: '18:30', endTime: '19:30', isActive: false },
+  { therapistId: '', dayOfWeek: 4, startTime: '16:30', endTime: '17:30', isActive: false },
 
   // Waldek (Waldemar) - Wednesday 12:00-14:00, Thursday 07:00-11:00, Friday 07:00-11:00
   { therapistId: '', dayOfWeek: 3, startTime: '12:00', endTime: '14:00', isActive: true },
   { therapistId: '', dayOfWeek: 4, startTime: '07:00', endTime: '11:00', isActive: true },
   { therapistId: '', dayOfWeek: 5, startTime: '07:00', endTime: '11:00', isActive: true },
-
-  // Natalia - Monday 18:30-19:30, Thursday 16:30-17:30
-  { therapistId: '', dayOfWeek: 1, startTime: '18:30', endTime: '19:30', isActive: true },
-  { therapistId: '', dayOfWeek: 4, startTime: '16:30', endTime: '17:30', isActive: true },
 ];
 
 export const getAvailability = async (): Promise<Availability[]> => {
@@ -64,16 +65,16 @@ export const initializeDefaultAvailability = async (therapistId: string, therapi
     defaults = [
       { therapistId, dayOfWeek: 5, startTime: '19:30', endTime: '21:00', isActive: true },
     ];
+  } else if (therapistName.includes('Natalia')) {
+    defaults = [
+      { therapistId, dayOfWeek: 1, startTime: '18:30', endTime: '19:30', isActive: false },
+      { therapistId, dayOfWeek: 4, startTime: '16:30', endTime: '17:30', isActive: false },
+    ];
   } else if (therapistName.includes('Waldemar') || therapistName.includes('Waldek')) {
     defaults = [
       { therapistId, dayOfWeek: 3, startTime: '12:00', endTime: '14:00', isActive: true },
       { therapistId, dayOfWeek: 4, startTime: '07:00', endTime: '11:00', isActive: true },
       { therapistId, dayOfWeek: 5, startTime: '07:00', endTime: '11:00', isActive: true },
-    ];
-  } else if (therapistName.includes('Natalia')) {
-    defaults = [
-      { therapistId, dayOfWeek: 1, startTime: '18:30', endTime: '19:30', isActive: true },
-      { therapistId, dayOfWeek: 4, startTime: '16:30', endTime: '17:30', isActive: true },
     ];
   }
 

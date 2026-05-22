@@ -23,6 +23,7 @@ import { Session, Therapist, Patient, Availability, AvailabilityOverride, WORKIN
 import { useAuth } from '../context/AuthContext';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
+const BOOKING_DISABLED_THERAPIST_NAMES = new Set(['Natalia Pucz']);
 
 // Generate time slots dynamically based on slotDuration
 const generateTimeSlots = () => {
@@ -92,6 +93,12 @@ export function CalendarPage() {
     loadData();
   }, [weekStart, weekEnd]);
 
+  useEffect(() => {
+    if (selectedTherapist !== 'all' && !therapists.some(t => t.id === selectedTherapist)) {
+      setSelectedTherapist('all');
+    }
+  }, [selectedTherapist, therapists]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -160,6 +167,11 @@ export function CalendarPage() {
 
   // Check if a therapist is available at a given time slot (with overrides)
   const isTherapistAvailable = (date: Date, time: string, therapistId: string): boolean => {
+    const therapist = therapists.find(t => t.id === therapistId);
+    if (therapist && BOOKING_DISABLED_THERAPIST_NAMES.has(therapist.name)) {
+      return false;
+    }
+
     const dayOfWeek = date.getDay();
     const dateStr = format(date, 'yyyy-MM-dd');
     const endTime = addMinutesToTime(time, WORKING_HOURS.slotDuration);

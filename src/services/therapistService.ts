@@ -75,7 +75,18 @@ export const THERAPIST_COLORS = [
   { bg: 'bg-rose-100', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500' },
 ];
 
+const UNKNOWN_THERAPIST_COLOR = {
+  bg: 'bg-slate-100',
+  text: 'text-slate-600',
+  border: 'border-slate-200',
+  dot: 'bg-slate-400',
+};
+
 export const getTherapistColor = (index: number) => {
+  if (!Number.isFinite(index) || index < 0) {
+    return UNKNOWN_THERAPIST_COLOR;
+  }
+
   return THERAPIST_COLORS[index % THERAPIST_COLORS.length];
 };
 
