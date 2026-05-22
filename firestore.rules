@@ -2,29 +2,109 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Pomocnicza funkcja - sprawdza czy użytkownik jest zalogowany
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Pomocnicza funkcja - sprawdza czy użytkownik jest adminem
-    function isAdmin() {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    function hasAuthEmail() {
+      return isAuthenticated() && request.auth.token.email is string;
     }
 
-    // Pomocnicza funkcja - sprawdza czy użytkownik jest właścicielem dokumentu
+    function authEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function signedInUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isKnownAdminEmail() {
+      return hasAuthEmail() && authEmail() in [
+        'dariusz.szuca@gmail.com',
+        'krystiannagaba@gmail.com',
+        'mywaymarcin@gmail.com',
+        'waldemarsikorski77@gmail.com',
+        'b.mikolajczewski@wp.pl'
+      ];
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && signedInUser().role == 'admin';
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function validUserKeys() {
+      return request.resource.data.keys().hasOnly([
+        'email',
+        'displayName',
+        'role',
+        'patientId',
+        'createdAt'
+      ]);
+    }
+
+    function validPatientLink() {
+      return request.resource.data.patientId == null ||
+        get(/databases/$(database)/documents/patients/$(request.resource.data.patientId)).data.email == authEmail();
+    }
+
+    function validUserCreate() {
+      return hasAuthEmail() &&
+        validUserKeys() &&
+        request.resource.data.email == authEmail() &&
+        (
+          (request.resource.data.role == 'admin' &&
+            isKnownAdminEmail() &&
+            request.resource.data.patientId == null) ||
+          (request.resource.data.role == 'patient' && validPatientLink())
+        );
+    }
+
+    function validOwnerRoleUpdate() {
+      return request.resource.data.role == resource.data.role ||
+        (
+          resource.data.role == 'patient' &&
+          request.resource.data.role == 'admin' &&
+          isKnownAdminEmail()
+        );
+    }
+
+    function validOwnerPatientLinkUpdate() {
+      return request.resource.data.patientId == resource.data.patientId || validPatientLink();
+    }
+
+    function validOwnerUserUpdate() {
+      return hasAuthEmail() &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'patientId', 'role']) &&
+        validOwnerRoleUpdate() &&
+        validOwnerPatientLinkUpdate();
+    }
+
+    function validSessionKeys() {
+      return request.resource.data.keys().hasOnly([
+        'patientId',
+        'patientName',
+        'therapistId',
+        'therapistName',
+        'date',
+        'startTime',
+        'endTime',
+        'status',
+        'notes',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
+
     // USERS - kolekcja użytkowników z rolami
     match /users/{userId} {
-      // Użytkownik może czytać i tworzyć swój własny dokument
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId);
-      // Tylko admin może modyfikować role
-      allow update: if isAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && validUserCreate();
+      allow update: if isAdmin() || (isOwner(userId) && validOwnerUserUpdate());
     }
 
     // PATIENTS - pacjenci
@@ -33,8 +113,8 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       // Pacjent może czytać tylko swój rekord (powiązany przez email lub patientId w users)
       allow read: if isAuthenticated() &&
-        (resource.data.email == request.auth.token.email ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patientId == patientId);
+        ((hasAuthEmail() && resource.data.email == authEmail()) ||
+         signedInUser().patientId == patientId);
     }
 
     // THERAPISTS - terapeuci
@@ -71,10 +151,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       // Pacjent może tworzyć rezerwację tylko dla siebie
       allow create: if isAuthenticated() &&
-        request.resource.data.patientId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patientId;
+        validSessionKeys() &&
+        request.resource.data.status == 'scheduled' &&
+        request.resource.data.patientId == signedInUser().patientId;
       // Pacjent może odwołać swoją własną wizytę (zmiana statusu na 'cancelled')
       allow update: if isAuthenticated() &&
-        resource.data.patientId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patientId &&
+        resource.data.patientId == signedInUser().patientId &&
         request.resource.data.status == 'cancelled' &&
         resource.data.status == 'scheduled' &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
