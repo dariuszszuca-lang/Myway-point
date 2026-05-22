@@ -14,7 +14,7 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-import { getSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek, isTimeSlotAvailable } from '../services/sessionService';
+import { getSessionsByDateRange, getPatientSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek, isTimeSlotAvailable } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailableWithOverrides } from '../services/availabilityService';
@@ -133,8 +133,7 @@ export function CalendarPage() {
         ]);
       } else if (patientData) {
         // Patient sees only their own sessions
-        sessionsData = (await getSessionsByDateRange(weekStart, weekEnd))
-          .filter(s => s.patientId === patientData.id);
+        sessionsData = await getPatientSessionsByDateRange(patientData.id, weekStart, weekEnd);
         patientsData = [patientData]; // Only themselves
       }
 

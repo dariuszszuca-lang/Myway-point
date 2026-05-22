@@ -36,6 +36,17 @@ export interface Session {
   updatedAt: number;
 }
 
+export interface BookedSlot {
+  id: string; // Same as session ID
+  sessionId: string;
+  therapistId: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  status: SessionStatus;
+  updatedAt: number;
+}
+
 export interface Availability {
   id: string;
   therapistId: string;

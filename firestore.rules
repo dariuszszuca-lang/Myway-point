@@ -100,6 +100,35 @@ service cloud.firestore {
       ]);
     }
 
+    function validBookedSlotKeys() {
+      return request.resource.data.keys().hasOnly([
+        'sessionId',
+        'therapistId',
+        'date',
+        'startTime',
+        'endTime',
+        'status',
+        'updatedAt'
+      ]);
+    }
+
+    function bookedSlotMatchesSession(sessionId) {
+      let session = getAfter(/databases/$(database)/documents/sessions/$(sessionId)).data;
+      return validBookedSlotKeys() &&
+        request.resource.data.sessionId == sessionId &&
+        request.resource.data.therapistId == session.therapistId &&
+        request.resource.data.date == session.date &&
+        request.resource.data.startTime == session.startTime &&
+        request.resource.data.endTime == session.endTime &&
+        request.resource.data.status == session.status;
+    }
+
+    function canWriteOwnBookedSlot(sessionId) {
+      return isAuthenticated() &&
+        getAfter(/databases/$(database)/documents/sessions/$(sessionId)).data.patientId == signedInUser().patientId &&
+        bookedSlotMatchesSession(sessionId);
+    }
+
     // USERS - kolekcja użytkowników z rolami
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
@@ -141,14 +170,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // BOOKED_SLOTS - anonimowe zajęte terminy, bez danych pacjenta
+    match /booked_slots/{slotId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || canWriteOwnBookedSlot(slotId);
+      allow update: if isAdmin() ||
+        (canWriteOwnBookedSlot(slotId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+          request.resource.data.status == 'cancelled');
+      allow delete: if isAdmin();
+    }
+
     // SESSIONS - sesje/rezerwacje
     // Walidacja dat (brak dat wstecz, 3 dni min dla pacjentów) — frontend-side
     // Firestore rules nie obsługują porównania stringów dat z request.time
     match /sessions/{sessionId} {
       // Admini mają pełny dostęp
       allow read, write: if isAdmin();
-      // Wszyscy zalogowani mogą czytać sesje (potrzebne do wyświetlania zajętych terminów)
-      allow read: if isAuthenticated();
+      // Pacjent może czytać tylko swoje pełne rezerwacje
+      allow read: if isAuthenticated() && resource.data.patientId == signedInUser().patientId;
       // Pacjent może tworzyć rezerwację tylko dla siebie
       allow create: if isAuthenticated() &&
         validSessionKeys() &&
