@@ -138,7 +138,8 @@ export function CalendarPage() {
       }
 
       setSessions(sessionsData);
-      setTherapists(therapistsData);
+      // Pacjent widzi tylko terapeutów przyjmujących (active !== false). Admin widzi wszystkich.
+      setTherapists(isAdmin ? therapistsData : therapistsData.filter(t => t.active !== false));
       setPatients(patientsData);
       setAvailability(availabilityData);
       setOverrides(overridesData);

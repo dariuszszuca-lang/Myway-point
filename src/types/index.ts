@@ -4,6 +4,7 @@ export interface Therapist {
   specialization: string;
   color: string; // For calendar display
   avatar?: string;
+  active?: boolean; // false = terapeuta nie przyjmuje, ukryty na liście wyboru pacjenta (admin widzi nadal)
 }
 
 export interface Patient {
