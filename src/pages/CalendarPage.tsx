@@ -18,7 +18,7 @@ import { getSessionsByDateRange, getPatientSessionsByDateRange, createSession, u
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailableWithOverrides } from '../services/availabilityService';
-import { getOverrides, addOverride, updateOverride, deleteOverride } from '../services/overrideService';
+import { getOverrides, addOverride, deleteOverride } from '../services/overrideService';
 import { Session, Therapist, Patient, Availability, AvailabilityOverride, WORKING_HOURS, CreateSessionData } from '../types';
 import { useAuth } from '../context/AuthContext';
 
@@ -70,10 +70,9 @@ export function CalendarPage() {
   const [overrideDate, setOverrideDate] = useState('');
   const [overrideTherapistId, setOverrideTherapistId] = useState('');
   const [overrideType, setOverrideType] = useState<'unavailable' | 'custom'>('unavailable');
-  const [overrideStartTime, setOverrideStartTime] = useState('09:00');
-  const [overrideEndTime, setOverrideEndTime] = useState('17:00');
+  const [overrideRanges, setOverrideRanges] = useState<{ startTime: string; endTime: string }[]>([{ startTime: '09:00', endTime: '17:00' }]);
   const [overrideReason, setOverrideReason] = useState('');
-  const [editingOverrideId, setEditingOverrideId] = useState<string | null>(null);
+  const [hasExistingOverride, setHasExistingOverride] = useState(false);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,49 +190,75 @@ export function CalendarPage() {
   // === OVERRIDE FUNCTIONS ===
   const openOverrideModal = (date: Date, therapistId: string) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const existing = overrides.find(o => o.therapistId === therapistId && o.date === dateStr);
+    // Wczytaj WSZYSTKIE zmiany dostępności dla tego dnia (może być kilka przedziałów)
+    const existing = overrides.filter(o => o.therapistId === therapistId && o.date === dateStr);
 
     setOverrideDate(dateStr);
     setOverrideTherapistId(therapistId);
 
-    if (existing) {
-      setOverrideType(existing.type);
-      setOverrideStartTime(existing.startTime || '09:00');
-      setOverrideEndTime(existing.endTime || '17:00');
-      setOverrideReason(existing.reason || '');
-      setEditingOverrideId(existing.id);
+    if (existing.length > 0) {
+      const unavailable = existing.find(o => o.type === 'unavailable');
+      if (unavailable) {
+        setOverrideType('unavailable');
+        setOverrideRanges([{ startTime: '09:00', endTime: '17:00' }]);
+        setOverrideReason(unavailable.reason || '');
+      } else {
+        const ranges = existing
+          .filter(o => o.type === 'custom')
+          .map(o => ({ startTime: o.startTime || '09:00', endTime: o.endTime || '17:00' }))
+          .sort((a, b) => a.startTime.localeCompare(b.startTime));
+        setOverrideType('custom');
+        setOverrideRanges(ranges.length ? ranges : [{ startTime: '09:00', endTime: '17:00' }]);
+        setOverrideReason(existing.find(o => o.reason)?.reason || '');
+      }
+      setHasExistingOverride(true);
     } else {
       setOverrideType('unavailable');
-      setOverrideStartTime('09:00');
-      setOverrideEndTime('17:00');
+      setOverrideRanges([{ startTime: '09:00', endTime: '17:00' }]);
       setOverrideReason('');
-      setEditingOverrideId(null);
+      setHasExistingOverride(false);
     }
 
     setIsOverrideModalOpen(true);
   };
 
+  // Helpery do listy przedziałów
+  const updateRange = (i: number, field: 'startTime' | 'endTime', value: string) =>
+    setOverrideRanges(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
+  const addRange = () =>
+    setOverrideRanges(rs => [...rs, { startTime: '17:00', endTime: '20:00' }]);
+  const removeRange = (i: number) =>
+    setOverrideRanges(rs => (rs.length > 1 ? rs.filter((_, idx) => idx !== i) : rs));
+
   const saveOverride = async () => {
-    const data: Record<string, any> = {
-      therapistId: overrideTherapistId,
-      date: overrideDate,
-      type: overrideType as 'unavailable' | 'custom',
-    };
-
-    if (overrideType === 'custom') {
-      data.startTime = overrideStartTime;
-      data.endTime = overrideEndTime;
-    }
-
-    if (overrideReason) {
-      data.reason = overrideReason;
-    }
-
     try {
-      if (editingOverrideId) {
-        await updateOverride(editingOverrideId, data);
-      } else {
+      // Skasuj wszystkie dotychczasowe zmiany dla tego dnia i zapisz od nowa
+      const existing = overrides.filter(
+        o => o.therapistId === overrideTherapistId && o.date === overrideDate
+      );
+      await Promise.all(existing.map(o => deleteOverride(o.id)));
+
+      if (overrideType === 'unavailable') {
+        const data: Record<string, any> = {
+          therapistId: overrideTherapistId,
+          date: overrideDate,
+          type: 'unavailable',
+        };
+        if (overrideReason) data.reason = overrideReason;
         await addOverride(data as any);
+      } else {
+        // custom: jeden dokument na każdy przedział godzin
+        for (const r of overrideRanges) {
+          const data: Record<string, any> = {
+            therapistId: overrideTherapistId,
+            date: overrideDate,
+            type: 'custom',
+            startTime: r.startTime,
+            endTime: r.endTime,
+          };
+          if (overrideReason) data.reason = overrideReason;
+          await addOverride(data as any);
+        }
       }
 
       setIsOverrideModalOpen(false);
@@ -245,10 +270,16 @@ export function CalendarPage() {
   };
 
   const removeOverride = async () => {
-    if (editingOverrideId) {
-      await deleteOverride(editingOverrideId);
+    try {
+      const existing = overrides.filter(
+        o => o.therapistId === overrideTherapistId && o.date === overrideDate
+      );
+      await Promise.all(existing.map(o => deleteOverride(o.id)));
       setIsOverrideModalOpen(false);
       await loadData();
+    } catch (error) {
+      console.error('Błąd przywracania domyślnej dostępności:', error);
+      alert('Nie udało się przywrócić domyślnej dostępności.');
     }
   };
 
@@ -1165,27 +1196,50 @@ export function CalendarPage() {
               </div>
             </div>
 
-            {/* Godziny (tylko dla custom) */}
+            {/* Godziny (tylko dla custom) — wiele przedziałów */}
             {overrideType === 'custom' && (
-              <div className="mb-4 flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Od</label>
-                  <input
-                    type="time"
-                    value={overrideStartTime}
-                    onChange={(e) => setOverrideStartTime(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  />
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Przedziały godzin</label>
+                <div className="space-y-2">
+                  {overrideRanges.map((r, i) => (
+                    <div key={i} className="flex gap-3 items-end">
+                      <div className="flex-1">
+                        {i === 0 && <span className="block text-xs text-gray-500 mb-1">Od</span>}
+                        <input
+                          type="time"
+                          value={r.startTime}
+                          onChange={(e) => updateRange(i, 'startTime', e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        {i === 0 && <span className="block text-xs text-gray-500 mb-1">Do</span>}
+                        <input
+                          type="time"
+                          value={r.endTime}
+                          onChange={(e) => updateRange(i, 'endTime', e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeRange(i)}
+                        disabled={overrideRanges.length === 1}
+                        title="Usuń przedział"
+                        className="mb-0.5 p-2 text-gray-400 hover:text-red-600 disabled:opacity-30 disabled:hover:text-gray-400"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Do</label>
-                  <input
-                    type="time"
-                    value={overrideEndTime}
-                    onChange={(e) => setOverrideEndTime(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={addRange}
+                  className="mt-2 text-sm font-medium text-teal-700 hover:text-teal-800"
+                >
+                  + Dodaj przedział
+                </button>
               </div>
             )}
 
@@ -1207,9 +1261,9 @@ export function CalendarPage() {
                 onClick={saveOverride}
                 className="flex-1 bg-teal-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-teal-700 transition"
               >
-                {editingOverrideId ? 'Zapisz zmiany' : 'Dodaj zmianę'}
+                {hasExistingOverride ? 'Zapisz zmiany' : 'Dodaj zmianę'}
               </button>
-              {editingOverrideId && (
+              {hasExistingOverride && (
                 <button
                   onClick={removeOverride}
                   className="px-4 bg-gray-100 text-gray-600 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
