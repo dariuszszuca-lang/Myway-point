@@ -118,11 +118,6 @@ export const DEFAULT_THERAPISTS: Omit<Therapist, 'id'>[] = [
     color: '#7c3aed', // violet
   },
   {
-    name: 'Bogdan Mikołajczewski',
-    specialization: 'Terapeuta uzależnień',
-    color: '#2563eb', // blue
-  },
-  {
     name: 'Waldemar Sikorski',
     specialization: 'Terapeuta uzależnień',
     color: '#ea580c', // orange
