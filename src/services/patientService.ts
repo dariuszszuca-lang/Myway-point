@@ -7,7 +7,17 @@ const patientsCollectionRef = collection(db, 'patients');
 export const getPatients = async (): Promise<Patient[]> => {
     const q = query(patientsCollectionRef, orderBy('name', 'asc'));
     const data = await getDocs(q);
-    return data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Patient[];
+    // Guard: starsze dokumenty moga nie miec pol pakietu -> undefined w arytmetyce = NaN.
+    // Normalizujemy do liczby przy kazdym odczycie, zeby NaN nie trafil do UI.
+    return data.docs.map(doc => {
+        const d = doc.data();
+        return {
+            ...d,
+            id: doc.id,
+            totalSessions: Number.isFinite(d.totalSessions) ? d.totalSessions : 0,
+            usedSessions: Number.isFinite(d.usedSessions) ? d.usedSessions : 0,
+        } as Patient;
+    });
 };
 
 export const addPatient = async (patientData: Omit<Patient, 'id'>) => {

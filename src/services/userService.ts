@@ -54,7 +54,14 @@ export const findPatientByEmail = async (email: string): Promise<Patient | null>
 
   if (!querySnapshot.empty) {
     const doc = querySnapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as Patient;
+    const d = doc.data();
+    // Guard: brak pol pakietu (starsze konta) -> NaN w panelu pacjenta. Normalizujemy do liczby.
+    return {
+      ...d,
+      id: doc.id,
+      totalSessions: Number.isFinite(d.totalSessions) ? d.totalSessions : 0,
+      usedSessions: Number.isFinite(d.usedSessions) ? d.usedSessions : 0,
+    } as Patient;
   }
   return null;
 };
