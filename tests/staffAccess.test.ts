@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getTherapistNameForEmail,
+  resolveStaffAccess,
   resolveTherapistIdForEmail,
 } from '../src/auth/staffAccess.ts';
 
@@ -35,4 +36,23 @@ test('refuses an ambiguous or inactive therapist match', () => {
 
   assert.equal(resolveTherapistIdForEmail('stanislaw.babinski@gmail.com', duplicate), null);
   assert.equal(resolveTherapistIdForEmail('stanislaw.babinski@gmail.com', inactive), null);
+});
+
+test('assigns therapist access only when an active unique therapist exists', () => {
+  const therapists = [
+    { id: 'current-id', name: 'Stanisław Babiński', active: true },
+  ];
+
+  assert.deepEqual(
+    resolveStaffAccess('stanislaw.babinski@gmail.com', false, therapists),
+    { role: 'therapist', therapistId: 'current-id' },
+  );
+  assert.equal(resolveStaffAccess('unknown@example.com', false, therapists), null);
+});
+
+test('keeps administrator access above therapist mapping', () => {
+  assert.deepEqual(resolveStaffAccess('admin@example.com', true, []), {
+    role: 'admin',
+    therapistId: null,
+  });
 });

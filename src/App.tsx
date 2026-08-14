@@ -80,7 +80,7 @@ export default function App() {
 
 // --- Main Application Layout ---
 function MainLayout() {
-  const { isAdmin, patientData, user } = useAuth();
+  const { isAdmin, isTherapist, patientData, user } = useAuth();
 
   return (
     <div className="min-h-screen bg-myway-bg flex font-sans text-myway-text">
@@ -182,7 +182,7 @@ function MainLayout() {
           <div className="flex items-center gap-2">
             {!isAdmin && (
               <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-medium">
-                Konto pacjenta
+                {isTherapist ? 'Konto terapeuty' : 'Konto pacjenta'}
               </span>
             )}
           </div>

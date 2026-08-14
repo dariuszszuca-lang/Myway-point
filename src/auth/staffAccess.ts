@@ -4,6 +4,10 @@ export interface TherapistIdentity {
   active?: boolean;
 }
 
+export type StaffAccess =
+  | { role: 'admin'; therapistId: null }
+  | { role: 'therapist'; therapistId: string };
+
 const THERAPIST_ACCOUNTS = new Map<string, string>([
   ['stanislaw.babinski@gmail.com', 'Stanisław Babiński'],
 ]);
@@ -25,4 +29,17 @@ export const resolveTherapistIdForEmail = (
   );
 
   return matches.length === 1 ? matches[0].id : null;
+};
+
+export const resolveStaffAccess = (
+  email: string,
+  isAdmin: boolean,
+  therapists: TherapistIdentity[],
+): StaffAccess | null => {
+  if (isAdmin) {
+    return { role: 'admin', therapistId: null };
+  }
+
+  const therapistId = resolveTherapistIdForEmail(email, therapists);
+  return therapistId ? { role: 'therapist', therapistId } : null;
 };

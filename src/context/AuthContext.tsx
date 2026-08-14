@@ -9,6 +9,7 @@ interface AuthContextType {
   appUser: AppUser | null;
   role: UserRole | null;
   isAdmin: boolean;
+  isTherapist: boolean;
   patientData: Patient | null;
   loading: boolean;
 }
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   appUser: null,
   role: null,
   isAdmin: false,
+  isTherapist: false,
   patientData: null,
   loading: true
 });
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const role = appUser?.role ?? null;
   const isAdmin = role === 'admin';
+  const isTherapist = role === 'therapist' && Boolean(appUser?.therapistId);
 
   if (loading) {
     return (
@@ -85,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, appUser, role, isAdmin, patientData, loading }}>
+    <AuthContext.Provider value={{ user, appUser, role, isAdmin, isTherapist, patientData, loading }}>
       {children}
     </AuthContext.Provider>
   );
