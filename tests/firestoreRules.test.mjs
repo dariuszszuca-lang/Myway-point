@@ -79,6 +79,22 @@ beforeEach(async () => {
       patientId: null,
       createdAt: 1,
     });
+    await setDoc(doc(db, 'users/patient-user'), {
+      email: 'patient@example.com',
+      displayName: 'Pacjent testowy',
+      role: 'patient',
+      patientId: 'patient-1',
+      therapistId: null,
+      createdAt: 1,
+    });
+    await setDoc(doc(db, 'users/admin-user'), {
+      email: 'dariusz.szuca@gmail.com',
+      displayName: 'Administrator',
+      role: 'admin',
+      patientId: null,
+      therapistId: null,
+      createdAt: 1,
+    });
     await setDoc(doc(db, 'sessions/own-session'), session('therapist-current', 'patient-1'));
     await setDoc(doc(db, 'sessions/foreign-session'), session('therapist-foreign', 'patient-2'));
     await setDoc(doc(db, 'patients/patient-1'), {
@@ -86,6 +102,14 @@ beforeEach(async () => {
       email: 'patient@example.com',
       totalSessions: 10,
       usedSessions: 1,
+      sessionsHistory: [],
+      createdAt: 1,
+    });
+    await setDoc(doc(db, 'patients/patient-therapist-email'), {
+      name: 'Historyczny rekord',
+      email: 'stanislaw.babinski@gmail.com',
+      totalSessions: 0,
+      usedSessions: 0,
       sessionsHistory: [],
       createdAt: 1,
     });
@@ -104,6 +128,9 @@ test('known therapist can migrate their own user document', async () => {
   await assertSucceeds(setDoc(doc(db, 'users/migration-user'), {
     role: 'therapist',
     therapistId: 'therapist-current',
+  }, { merge: true }));
+  await assertFails(setDoc(doc(db, 'users/migration-user'), {
+    therapistId: 'therapist-foreign',
   }, { merge: true }));
 });
 
@@ -131,6 +158,7 @@ test('therapist query returns only own sessions', async () => {
   assert.equal(snapshot.size, 1);
   assert.equal(snapshot.docs[0].id, 'own-session');
   await assertFails(getDoc(doc(db, 'sessions/foreign-session')));
+  await assertFails(getDocs(collection(db, 'sessions')));
 });
 
 test('therapist cannot read patients or write sessions', async () => {
@@ -139,7 +167,43 @@ test('therapist cannot read patients or write sessions', async () => {
   }).firestore();
 
   await assertFails(getDoc(doc(db, 'patients/patient-1')));
+  await assertFails(getDoc(doc(db, 'patients/patient-therapist-email')));
+  await assertFails(setDoc(
+    doc(db, 'sessions/therapist-created-session'),
+    session('therapist-current', null),
+  ));
   await assertFails(updateDoc(doc(db, 'sessions/own-session'), {
+    status: 'completed',
+    updatedAt: 2,
+  }));
+});
+
+test('patient can still read only their own sessions', async () => {
+  const db = testEnv.authenticatedContext('patient-user', {
+    email: 'patient@example.com',
+  }).firestore();
+
+  await assertSucceeds(getDoc(doc(db, 'sessions/own-session')));
+  await assertFails(getDoc(doc(db, 'sessions/foreign-session')));
+  await assertSucceeds(getDoc(doc(db, 'patients/patient-1')));
+  await assertSucceeds(setDoc(
+    doc(db, 'sessions/patient-created-session'),
+    session('therapist-current', 'patient-1'),
+  ));
+  await assertSucceeds(updateDoc(doc(db, 'sessions/patient-created-session'), {
+    status: 'cancelled',
+    updatedAt: 2,
+  }));
+});
+
+test('admin retains full session access', async () => {
+  const db = testEnv.authenticatedContext('admin-user', {
+    email: 'dariusz.szuca@gmail.com',
+  }).firestore();
+
+  const snapshot = await assertSucceeds(getDocs(collection(db, 'sessions')));
+  assert.equal(snapshot.size, 2);
+  await assertSucceeds(updateDoc(doc(db, 'sessions/foreign-session'), {
     status: 'completed',
     updatedAt: 2,
   }));
