@@ -484,11 +484,11 @@ Filter therapistsData to the same ID and set selectedTherapist to that ID. Do no
 
 Add an immediate return for isTherapist in openNewSessionModal, openOverrideModal, handleCreateSession, handleEditSession, handleStatusChange and handleDeleteSession. Hide empty-slot plus buttons and override controls for therapist accounts. Existing session cards still open the read-only view modal.
 
-- [ ] **Step 5: Verify UI build and lint**
+- [ ] **Step 5: Verify UI tests and build**
 
-Run: npm test && npm run lint && npm run build
+Run: npm test && npm run build
 
-Expected: all tests pass, ESLint has zero warnings and Vite produces dist.
+Expected: all tests pass and the strict TypeScript/Vite build produces dist. The repository's pre-existing lint script is outside this fix because the baseline has neither ESLint dependencies nor an ESLint configuration (decision approved 2026-08-14).
 
 - [ ] **Step 6: Commit**
 
@@ -512,13 +512,12 @@ Run:
 ~~~bash
 npm test
 PATH="/tmp/mywaypoint-temurin-jre21/Contents/Home/bin:$PATH" firebase emulators:exec --only firestore --project demo-myway-point "node --test tests/firestoreRules.test.mjs"
-npm run lint
 npm run build
 git diff origin/main --check
 git status --short --branch
 ~~~
 
-Expected: all tests, emulator assertions, lint and build pass; only intentional files differ from origin/main.
+Expected: all tests, emulator assertions and build pass; only intentional files differ from origin/main.
 
 - [ ] **Step 2: Scan the staged diff for secrets**
 
