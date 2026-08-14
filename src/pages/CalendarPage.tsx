@@ -14,13 +14,15 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-import { getSessionsByDateRange, getPatientSessionsByDateRange, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek, isTimeSlotAvailable } from '../services/sessionService';
+import { getSessionsByDateRange, getPatientSessionsByDateRange, getSessionsByTherapist, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek, isTimeSlotAvailable } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
 import { getPatients, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { getAvailability, isTimeSlotAvailableWithOverrides } from '../services/availabilityService';
 import { getOverrides, addOverride, deleteOverride } from '../services/overrideService';
 import { Session, Therapist, Patient, Availability, AvailabilityOverride, WORKING_HOURS, CreateSessionData } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { selectTherapistSessions } from '../auth/sessionAccess';
+import { canLoadTherapistSchedule, getRoleCapabilities } from '../auth/accessPolicy';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
 const BOOKING_DISABLED_THERAPIST_NAMES = new Set(['Natalia Pucz']);
@@ -52,7 +54,9 @@ const addMinutesToTime = (time: string, minutes: number): string => {
 };
 
 export function CalendarPage() {
-  const { isAdmin, patientData, appUser } = useAuth();
+  const { isAdmin, isTherapist, patientData, appUser, role } = useAuth();
+  const capabilities = getRoleCapabilities(role);
+  const therapistScheduleReady = canLoadTherapistSchedule(role, appUser?.therapistId ?? null);
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -93,14 +97,31 @@ export function CalendarPage() {
   }, [weekStart, weekEnd]);
 
   useEffect(() => {
+    if (isTherapist && appUser?.therapistId) {
+      if (selectedTherapist !== appUser.therapistId) {
+        setSelectedTherapist(appUser.therapistId);
+      }
+      return;
+    }
+
     if (selectedTherapist !== 'all' && !therapists.some(t => t.id === selectedTherapist)) {
       setSelectedTherapist('all');
     }
-  }, [selectedTherapist, therapists]);
+  }, [appUser?.therapistId, isTherapist, selectedTherapist, therapists]);
 
   const loadData = async () => {
     setLoading(true);
     try {
+      if (isTherapist && !therapistScheduleReady) {
+        setSessions([]);
+        setTherapists([]);
+        setPatients([]);
+        setAvailability([]);
+        setOverrides([]);
+        setLoading(false);
+        return;
+      }
+
       // Admin-only: ensure default therapists and availability exist
       if (isAdmin) {
         await ensureTherapistsExist();
@@ -121,7 +142,7 @@ export function CalendarPage() {
         console.warn('Nie udało się pobrać overrides (kolekcja może nie istnieć):', e);
       }
 
-      // Sessions and patients - admin gets all, patient gets filtered
+      // Sessions and patients - every role gets only the data allowed by Firestore rules.
       let sessionsData: Session[] = [];
       let patientsData: Patient[] = [];
 
@@ -130,6 +151,14 @@ export function CalendarPage() {
           getSessionsByDateRange(weekStart, weekEnd),
           getPatients(),
         ]);
+      } else if (isTherapist && appUser?.therapistId) {
+        const therapistId = appUser.therapistId;
+        const therapistSessions = await getSessionsByTherapist(therapistId);
+        sessionsData = selectTherapistSessions(therapistSessions, therapistId, {
+          startDate: weekStart,
+          endDate: weekEnd,
+          includeCancelled: true,
+        });
       } else if (patientData) {
         // Patient sees only their own sessions
         sessionsData = await getPatientSessionsByDateRange(patientData.id, weekStart, weekEnd);
@@ -137,11 +166,21 @@ export function CalendarPage() {
       }
 
       setSessions(sessionsData);
-      // Pacjent widzi tylko terapeutów przyjmujących (active !== false). Admin widzi wszystkich.
-      setTherapists(isAdmin ? therapistsData : therapistsData.filter(t => t.active !== false));
+      if (isAdmin) {
+        setTherapists(therapistsData);
+      } else if (isTherapist && appUser?.therapistId) {
+        setTherapists(therapistsData.filter(t => t.id === appUser.therapistId));
+      } else {
+        // Pacjent widzi tylko terapeutów przyjmujących (active !== false).
+        setTherapists(therapistsData.filter(t => t.active !== false));
+      }
       setPatients(patientsData);
-      setAvailability(availabilityData);
-      setOverrides(overridesData);
+      setAvailability(isTherapist && appUser?.therapistId
+        ? availabilityData.filter(item => item.therapistId === appUser.therapistId)
+        : availabilityData);
+      setOverrides(isTherapist && appUser?.therapistId
+        ? overridesData.filter(item => item.therapistId === appUser.therapistId)
+        : overridesData);
     } catch (error) {
       console.error('Error loading calendar data:', error);
     }
@@ -189,6 +228,7 @@ export function CalendarPage() {
 
   // === OVERRIDE FUNCTIONS ===
   const openOverrideModal = (date: Date, therapistId: string) => {
+    if (!capabilities.canManageSessions) return;
     const dateStr = format(date, 'yyyy-MM-dd');
     // Wczytaj WSZYSTKIE zmiany dostępności dla tego dnia (może być kilka przedziałów)
     const existing = overrides.filter(o => o.therapistId === therapistId && o.date === dateStr);
@@ -231,6 +271,7 @@ export function CalendarPage() {
     setOverrideRanges(rs => (rs.length > 1 ? rs.filter((_, idx) => idx !== i) : rs));
 
   const saveOverride = async () => {
+    if (!capabilities.canManageSessions) return;
     try {
       // Skasuj wszystkie dotychczasowe zmiany dla tego dnia i zapisz od nowa
       const existing = overrides.filter(
@@ -270,6 +311,7 @@ export function CalendarPage() {
   };
 
   const removeOverride = async () => {
+    if (!capabilities.canManageSessions) return;
     try {
       const existing = overrides.filter(
         o => o.therapistId === overrideTherapistId && o.date === overrideDate
@@ -290,6 +332,7 @@ export function CalendarPage() {
   };
 
   const openNewSessionModal = (date: Date, time: string, therapistId?: string) => {
+    if (!capabilities.canBookSessions) return;
     setModalMode('create');
     setSelectedSession(null);
 
@@ -325,6 +368,7 @@ export function CalendarPage() {
   };
 
   const openEditSessionModal = (session: Session) => {
+    if (!capabilities.canManageSessions) return;
     setModalMode('edit');
     setSelectedSession(session);
     setNewSessionData({
@@ -341,6 +385,7 @@ export function CalendarPage() {
   };
 
   const handleEditSession = async () => {
+    if (!capabilities.canManageSessions) return;
     if (!selectedSession || !newSessionData.patientId || !newSessionData.therapistId || !newSessionData.date) {
       alert('Wypełnij wszystkie pola');
       return;
@@ -392,6 +437,7 @@ export function CalendarPage() {
   };
 
   const handleCreateSession = async () => {
+    if (!capabilities.canBookSessions) return;
     // For patients without active account - block reservation
     if (!isAdmin && !patientData) {
       alert('Twoje konto nie jest jeszcze aktywowane. Skontaktuj się z ośrodkiem MyWay.');
@@ -487,6 +533,7 @@ export function CalendarPage() {
   };
 
   const handleStatusChange = async (sessionId: string, newStatus: Session['status']) => {
+    if (!capabilities.canManageSessions) return;
     try {
       const previousStatus = selectedSession?.status;
       const patientId = selectedSession?.patientId;
@@ -514,6 +561,7 @@ export function CalendarPage() {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
+    if (!capabilities.canManageSessions) return;
     if (!confirm('Czy na pewno chcesz usunąć tę sesję?')) return;
     try {
       await deleteSession(sessionId);
@@ -525,6 +573,22 @@ export function CalendarPage() {
   };
 
   const getTherapistIndex = (id: string) => therapists.findIndex(t => t.id === id);
+
+  if (isTherapist && !therapistScheduleReady) {
+    return (
+      <div className="max-w-xl mx-auto mt-12 p-6 bg-amber-50 border border-amber-200 rounded-2xl">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-amber-600 mt-0.5" />
+          <div>
+            <h1 className="font-bold text-slate-800">Nie udało się powiązać konta terapeuty</h1>
+            <p className="text-sm text-slate-600 mt-1">
+              Skontaktuj się z administratorem MyWay. Konto pozostaje bez dostępu do rezerwacji.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -564,16 +628,18 @@ export function CalendarPage() {
 
       {/* Therapist Tabs */}
       <div className="bg-white rounded-2xl border border-slate-200 p-2 flex gap-2 flex-wrap">
-        <button
-          onClick={() => setSelectedTherapist('all')}
-          className={`px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
-            selectedTherapist === 'all'
-              ? 'bg-slate-800 text-white shadow-lg'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Wszyscy
-        </button>
+        {!isTherapist && (
+          <button
+            onClick={() => setSelectedTherapist('all')}
+            className={`px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
+              selectedTherapist === 'all'
+                ? 'bg-slate-800 text-white shadow-lg'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            Wszyscy
+          </button>
+        )}
         {therapists.map((therapist, idx) => {
           const colors = getTherapistColor(idx);
           const isActive = selectedTherapist === therapist.id;
@@ -723,7 +789,7 @@ export function CalendarPage() {
                             );
                           })}
                         </div>
-                      ) : isAvailable ? (
+                      ) : isAvailable && capabilities.canBookSessions ? (
                         <button
                           onClick={() => openNewSessionModal(day, time, selectedTherapist !== 'all' ? selectedTherapist : undefined)}
                           className={`absolute inset-1 flex items-center justify-center rounded-lg transition-all border-2 border-dashed ${

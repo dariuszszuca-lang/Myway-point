@@ -6,8 +6,9 @@ import {
   resolveStaffAccess,
   type StaffAccess,
 } from '../auth/staffAccess';
+import type { AppRole } from '../auth/accessPolicy';
 
-export type UserRole = 'admin' | 'therapist' | 'patient';
+export type UserRole = AppRole;
 
 export interface AppUser {
   uid: string;

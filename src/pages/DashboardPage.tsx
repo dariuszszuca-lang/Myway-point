@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { endOfMonth, endOfWeek, format, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import {
   Calendar,
@@ -20,12 +20,13 @@ import {
   Minus,
   Save
 } from 'lucide-react';
-import { parseISO } from 'date-fns';
-import { getTodaySessions, getDashboardStats, updateSession, updateSessionStatus, deleteSession } from '../services/sessionService';
+import { getTodaySessions, getDashboardStats, getSessionsByTherapist, updateSession, updateSessionStatus, deleteSession } from '../services/sessionService';
 import { getPatients, updatePatient, incrementUsedSessions, decrementUsedSessions } from '../services/patientService';
 import { ensureDefaultTherapistsExist, getTherapists, getTherapistColor } from '../services/therapistService';
 import { Session, Therapist, Patient, WORKING_HOURS } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { selectTherapistSessions } from '../auth/sessionAccess';
+import { canLoadTherapistSchedule, getRoleCapabilities } from '../auth/accessPolicy';
 
 // Helper to add minutes to time string
 const addMinutesToTime = (time: string, minutes: number): string => {
@@ -54,7 +55,9 @@ const generateTimeSlots = () => {
 const TIME_SLOTS = generateTimeSlots();
 
 export function DashboardPage() {
-  const { isAdmin } = useAuth();
+  const { appUser, isAdmin, isTherapist, role } = useAuth();
+  const capabilities = getRoleCapabilities(role);
+  const therapistScheduleReady = canLoadTherapistSchedule(role, appUser?.therapistId ?? null);
 
   const [todaySessions, setTodaySessions] = useState<Session[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
@@ -82,21 +85,66 @@ export function DashboardPage() {
 
   const loadData = async () => {
     try {
-      if (isAdmin) {
-        await ensureDefaultTherapistsExist();
+      if (isTherapist && !therapistScheduleReady) {
+        setTodaySessions([]);
+        setTherapists([]);
+        setPatients([]);
+        setLoading(false);
+        return;
       }
 
-      const [sessionsData, therapistsData, patientsData, statsData] = await Promise.all([
-        getTodaySessions(),
-        getTherapists(),
-        getPatients(),
-        getDashboardStats(),
-      ]);
+      if (isTherapist && appUser?.therapistId) {
+        const therapistId = appUser.therapistId;
+        const [allSessions, therapistsData] = await Promise.all([
+          getSessionsByTherapist(therapistId),
+          getTherapists(),
+        ]);
+        const now = new Date();
+        const today = format(now, 'yyyy-MM-dd');
+        const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        const monthStart = format(startOfMonth(now), 'yyyy-MM-dd');
+        const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
+        const todayData = selectTherapistSessions(allSessions, therapistId, {
+          startDate: today,
+          endDate: today,
+        });
+        const weekData = selectTherapistSessions(allSessions, therapistId, {
+          startDate: weekStart,
+          endDate: weekEnd,
+        });
+        const monthData = selectTherapistSessions(allSessions, therapistId, {
+          startDate: monthStart,
+          endDate: monthEnd,
+          includeCancelled: true,
+        });
 
-      setTodaySessions(sessionsData.filter(s => s.status !== 'cancelled'));
-      setTherapists(therapistsData);
-      setPatients(patientsData);
-      setStats(statsData);
+        setTodaySessions(todayData);
+        setTherapists(therapistsData.filter(therapist => therapist.id === therapistId));
+        setPatients([]);
+        setStats({
+          todaySessions: todayData.length,
+          todayCompleted: todayData.filter(session => session.status === 'completed').length,
+          weekSessions: weekData.length,
+          monthCompleted: monthData.filter(session => session.status === 'completed').length,
+        });
+      } else {
+        if (isAdmin) {
+          await ensureDefaultTherapistsExist();
+        }
+
+        const [sessionsData, therapistsData, patientsData, statsData] = await Promise.all([
+          getTodaySessions(),
+          getTherapists(),
+          getPatients(),
+          getDashboardStats(),
+        ]);
+
+        setTodaySessions(sessionsData.filter(s => s.status !== 'cancelled'));
+        setTherapists(therapistsData);
+        setPatients(patientsData);
+        setStats(statsData);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     }
@@ -111,6 +159,7 @@ export function DashboardPage() {
   };
 
   const openEditModal = (session: Session) => {
+    if (!capabilities.canManageSessions) return;
     setModalMode('edit');
     setSelectedSession(session);
     setEditData({
@@ -127,6 +176,7 @@ export function DashboardPage() {
   };
 
   const handleEditSession = async () => {
+    if (!capabilities.canManageSessions) return;
     if (!selectedSession || !editData.patientId || !editData.therapistId || !editData.date) return;
 
     // Block past dates
@@ -158,6 +208,7 @@ export function DashboardPage() {
   };
 
   const handleStatusChange = async (sessionId: string, newStatus: Session['status']) => {
+    if (!capabilities.canManageSessions) return;
     try {
       const previousStatus = selectedSession?.status;
       const patientId = selectedSession?.patientId;
@@ -178,6 +229,7 @@ export function DashboardPage() {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
+    if (!capabilities.canManageSessions) return;
     if (!confirm('Czy na pewno chcesz usunąć tę sesję?')) return;
     try {
       await deleteSession(sessionId);
@@ -189,6 +241,7 @@ export function DashboardPage() {
   };
 
   const handleSavePackage = async () => {
+    if (!capabilities.canManageSessions) return;
     if (!selectedSession) return;
     setSavingPackage(true);
     try {
@@ -243,6 +296,22 @@ export function DashboardPage() {
     );
   }
 
+  if (isTherapist && !therapistScheduleReady) {
+    return (
+      <div className="max-w-xl mx-auto mt-12 p-6 bg-amber-50 border border-amber-200 rounded-2xl">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-amber-600 mt-0.5" />
+          <div>
+            <h1 className="font-bold text-slate-800">Nie udało się powiązać konta terapeuty</h1>
+            <p className="text-sm text-slate-600 mt-1">
+              Skontaktuj się z administratorem MyWay. Konto pozostaje bez dostępu do rezerwacji.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -259,13 +328,15 @@ export function DashboardPage() {
             <Calendar size={18} />
             Kalendarz
           </Link>
-          <Link
-            to="/calendar?action=new"
-            className="flex items-center gap-2 px-4 py-2.5 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/20"
-          >
-            <Plus size={18} />
-            Nowa sesja
-          </Link>
+          {capabilities.canBookSessions && (
+            <Link
+              to="/calendar?action=new"
+              className="flex items-center gap-2 px-4 py-2.5 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/20"
+            >
+              <Plus size={18} />
+              Nowa sesja
+            </Link>
+          )}
         </div>
       </div>
 
@@ -285,13 +356,15 @@ export function DashboardPage() {
           subtext="zaplanowane sesje"
           color="blue"
         />
-        <StatCard
-          icon={<Users className="w-6 h-6" />}
-          label="Pacjenci"
-          value={patients.length}
-          subtext="w bazie"
-          color="violet"
-        />
+        {!isTherapist && (
+          <StatCard
+            icon={<Users className="w-6 h-6" />}
+            label="Pacjenci"
+            value={patients.length}
+            subtext="w bazie"
+            color="violet"
+          />
+        )}
         <StatCard
           icon={<TrendingUp className="w-6 h-6" />}
           label="Ten miesiąc"
@@ -323,13 +396,15 @@ export function DashboardPage() {
                 <Calendar className="w-8 h-8 text-slate-400" />
               </div>
               <p className="text-slate-500 mb-4">Brak sesji na dziś</p>
-              <Link
-                to="/calendar?action=new"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-myway-primary text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
-              >
-                <Plus size={16} />
-                Zaplanuj sesję
-              </Link>
+              {capabilities.canBookSessions && (
+                <Link
+                  to="/calendar?action=new"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-myway-primary text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                >
+                  <Plus size={16} />
+                  Zaplanuj sesję
+                </Link>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -402,19 +477,21 @@ export function DashboardPage() {
             })}
           </div>
 
-          <div className="p-4 border-t border-slate-100">
-            <Link
-              to="/settings"
-              className="block w-full py-2.5 text-center text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-            >
-              Zarządzaj terapeutami
-            </Link>
-          </div>
+          {isAdmin && (
+            <div className="p-4 border-t border-slate-100">
+              <Link
+                to="/settings"
+                className="block w-full py-2.5 text-center text-sm font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Zarządzaj terapeutami
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Quick Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {isAdmin && <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Patients needing attention */}
         <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100 p-6">
           <div className="flex items-start justify-between mb-4">
@@ -457,7 +534,7 @@ export function DashboardPage() {
           <h3 className="font-semibold mb-1">Baza pacjentów</h3>
           <p className="text-sm text-white/60">Zarządzaj danymi pacjentów</p>
         </Link>
-      </div>
+      </div>}
 
       {/* Session Modal */}
       {isModalOpen && selectedSession && (

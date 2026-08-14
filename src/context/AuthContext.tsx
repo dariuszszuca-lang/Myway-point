@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const role = appUser?.role ?? null;
   const isAdmin = role === 'admin';
-  const isTherapist = role === 'therapist' && Boolean(appUser?.therapistId);
+  const isTherapist = role === 'therapist';
 
   if (loading) {
     return (
