@@ -73,11 +73,14 @@ export const getSessionsByDateRange = async (startDate: string, endDate: string)
 export const getSessionsByTherapist = async (therapistId: string): Promise<Session[]> => {
   const q = query(
     sessionsCollectionRef,
-    where('therapistId', '==', therapistId),
-    orderBy('date', 'asc')
+    where('therapistId', '==', therapistId)
   );
   const data = await getDocs(q);
-  return data.docs.map(mapSessionDoc);
+  return data.docs
+    .map(mapSessionDoc)
+    .sort((left, right) =>
+      `${left.date} ${left.startTime}`.localeCompare(`${right.date} ${right.startTime}`)
+    );
 };
 
 export const getPatientSessionsByDateRange = async (
