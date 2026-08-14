@@ -28,8 +28,19 @@ service cloud.firestore {
       ];
     }
 
+    function isKnownTherapistEmail() {
+      return hasAuthEmail() && authEmail() == 'stanislaw.babinski@gmail.com';
+    }
+
     function isAdmin() {
       return isAuthenticated() && signedInUser().role == 'admin';
+    }
+
+    function isTherapist() {
+      return isAuthenticated() &&
+        isKnownTherapistEmail() &&
+        signedInUser().role == 'therapist' &&
+        signedInUser().get('therapistId', null) is string;
     }
 
     function isOwner(userId) {
@@ -42,8 +53,21 @@ service cloud.firestore {
         'displayName',
         'role',
         'patientId',
+        'therapistId',
         'createdAt'
       ]);
+    }
+
+    function requestedTherapistId() {
+      return request.resource.data.get('therapistId', null);
+    }
+
+    function validTherapistLink() {
+      let therapistId = requestedTherapistId();
+      return isKnownTherapistEmail() &&
+        therapistId is string &&
+        get(/databases/$(database)/documents/therapists/$(therapistId)).data.name == 'Stanisław Babiński' &&
+        get(/databases/$(database)/documents/therapists/$(therapistId)).data.get('active', true) != false;
     }
 
     function validPatientLink() {
@@ -58,8 +82,14 @@ service cloud.firestore {
         (
           (request.resource.data.role == 'admin' &&
             isKnownAdminEmail() &&
-            request.resource.data.patientId == null) ||
-          (request.resource.data.role == 'patient' && validPatientLink())
+            request.resource.data.patientId == null &&
+            requestedTherapistId() == null) ||
+          (request.resource.data.role == 'therapist' &&
+            request.resource.data.patientId == null &&
+            validTherapistLink()) ||
+          (request.resource.data.role == 'patient' &&
+            requestedTherapistId() == null &&
+            validPatientLink())
         );
     }
 
@@ -69,19 +99,43 @@ service cloud.firestore {
           resource.data.role == 'patient' &&
           request.resource.data.role == 'admin' &&
           isKnownAdminEmail()
+        ) ||
+        (
+          resource.data.role == 'patient' &&
+          request.resource.data.role == 'therapist' &&
+          validTherapistLink()
         );
     }
 
     function validOwnerPatientLinkUpdate() {
-      return request.resource.data.patientId == resource.data.patientId || validPatientLink();
+      return (
+          request.resource.data.role != 'patient' &&
+          request.resource.data.patientId == null
+        ) ||
+        (
+          request.resource.data.role == 'patient' &&
+          (request.resource.data.patientId == resource.data.patientId || validPatientLink())
+        );
+    }
+
+    function validOwnerTherapistLinkUpdate() {
+      return (
+          request.resource.data.role == 'therapist' &&
+          (requestedTherapistId() == null || validTherapistLink())
+        ) ||
+        (
+          request.resource.data.role != 'therapist' &&
+          requestedTherapistId() == null
+        );
     }
 
     function validOwnerUserUpdate() {
       return hasAuthEmail() &&
         request.resource.data.email == resource.data.email &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'patientId', 'role']) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'patientId', 'therapistId', 'role']) &&
         validOwnerRoleUpdate() &&
-        validOwnerPatientLinkUpdate();
+        validOwnerPatientLinkUpdate() &&
+        validOwnerTherapistLinkUpdate();
     }
 
     function validSessionKeys() {
@@ -189,6 +243,9 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       // Pacjent może czytać tylko swoje pełne rezerwacje
       allow read: if isAuthenticated() && resource.data.patientId == signedInUser().patientId;
+      // Terapeuta może czytać tylko sesje przypisane do swojego aktualnego rekordu
+      allow read: if isTherapist() &&
+        resource.data.therapistId == signedInUser().get('therapistId', null);
       // Pacjent może tworzyć rezerwację tylko dla siebie
       allow create: if isAuthenticated() &&
         validSessionKeys() &&
