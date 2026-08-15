@@ -4,6 +4,8 @@ export interface RoleCapabilities {
   canViewSchedule: boolean;
   canBookSessions: boolean;
   canManageSessions: boolean;
+  canViewPatients: boolean;
+  canManagePatients: boolean;
   canAccessAdminPages: boolean;
 }
 
@@ -11,6 +13,8 @@ const NO_ACCESS: RoleCapabilities = {
   canViewSchedule: false,
   canBookSessions: false,
   canManageSessions: false,
+  canViewPatients: false,
+  canManagePatients: false,
   canAccessAdminPages: false,
 };
 
@@ -20,6 +24,8 @@ export const getRoleCapabilities = (role: AppRole | null): RoleCapabilities => {
       canViewSchedule: true,
       canBookSessions: true,
       canManageSessions: true,
+      canViewPatients: true,
+      canManagePatients: true,
       canAccessAdminPages: true,
     };
   }
@@ -29,6 +35,8 @@ export const getRoleCapabilities = (role: AppRole | null): RoleCapabilities => {
       canViewSchedule: true,
       canBookSessions: false,
       canManageSessions: false,
+      canViewPatients: true,
+      canManagePatients: false,
       canAccessAdminPages: false,
     };
   }
@@ -38,6 +46,8 @@ export const getRoleCapabilities = (role: AppRole | null): RoleCapabilities => {
       canViewSchedule: true,
       canBookSessions: true,
       canManageSessions: false,
+      canViewPatients: false,
+      canManagePatients: false,
       canAccessAdminPages: false,
     };
   }

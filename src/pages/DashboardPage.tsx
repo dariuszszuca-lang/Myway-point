@@ -95,9 +95,10 @@ export function DashboardPage() {
 
       if (isTherapist && appUser?.therapistId) {
         const therapistId = appUser.therapistId;
-        const [allSessions, therapistsData] = await Promise.all([
+        const [allSessions, therapistsData, patientsData] = await Promise.all([
           getSessionsByTherapist(therapistId),
           getTherapists(),
+          getPatients(),
         ]);
         const now = new Date();
         const today = format(now, 'yyyy-MM-dd');
@@ -121,7 +122,7 @@ export function DashboardPage() {
 
         setTodaySessions(todayData);
         setTherapists(therapistsData.filter(therapist => therapist.id === therapistId));
-        setPatients([]);
+        setPatients(patientsData);
         setStats({
           todaySessions: todayData.length,
           todayCompleted: todayData.filter(session => session.status === 'completed').length,
@@ -672,9 +673,7 @@ export function DashboardPage() {
                     </div>
                     {/* Contact info */}
                     {(isAdmin || isTherapist) && (() => {
-                      const sessionPatient = isAdmin
-                        ? patients.find(p => p.id === selectedSession.patientId)
-                        : undefined;
+                      const sessionPatient = patients.find(p => p.id === selectedSession.patientId);
                       const contact = getSessionContact(selectedSession, sessionPatient);
                       if (!contact) return null;
                       return (

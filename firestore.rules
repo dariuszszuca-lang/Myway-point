@@ -213,6 +213,8 @@ service cloud.firestore {
     match /patients/{patientId} {
       // Admini mają pełny dostęp
       allow read, write: if isAdmin();
+      // Znany terapeuta ma stały dostęp tylko do odczytu całej bazy pacjentów
+      allow read: if isTherapist();
       // Pacjent może czytać tylko swój rekord (powiązany przez email lub patientId w users)
       allow read: if isPatient() &&
         ((hasAuthEmail() && resource.data.email == authEmail()) ||

@@ -167,13 +167,18 @@ test('therapist query returns only own sessions', async () => {
   await assertFails(getDocs(collection(db, 'sessions')));
 });
 
-test('therapist cannot read patients or write sessions', async () => {
+test('therapist can read all patients but cannot modify patients or sessions', async () => {
   const db = testEnv.authenticatedContext('therapist-user', {
     email: 'stanislaw.babinski@gmail.com',
   }).firestore();
 
-  await assertFails(getDoc(doc(db, 'patients/patient-1')));
-  await assertFails(getDoc(doc(db, 'patients/patient-therapist-email')));
+  const patients = await assertSucceeds(getDocs(collection(db, 'patients')));
+  assert.equal(patients.size, 2);
+  await assertSucceeds(getDoc(doc(db, 'patients/patient-1')));
+  await assertSucceeds(getDoc(doc(db, 'patients/patient-therapist-email')));
+  await assertFails(updateDoc(doc(db, 'patients/patient-1'), {
+    phone: '+48 511 111 111',
+  }));
   await assertFails(setDoc(
     doc(db, 'sessions/therapist-created-session'),
     session('therapist-current', null),

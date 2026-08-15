@@ -19,6 +19,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { signOut, getAuth } from 'firebase/auth';
+import { getRoleCapabilities } from './auth/accessPolicy';
 
 // --- Protected Route ---
 function ProtectedRoute() {
@@ -38,6 +39,14 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PatientDirectoryRoute({ children }: { children: React.ReactNode }) {
+  const { role } = useAuth();
+  if (!getRoleCapabilities(role).canViewPatients) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -50,9 +59,9 @@ export default function App() {
             <Route
               path="patients"
               element={
-                <AdminRoute>
+                <PatientDirectoryRoute>
                   <PatientsPage />
-                </AdminRoute>
+                </PatientDirectoryRoute>
               }
             />
             <Route
@@ -80,7 +89,8 @@ export default function App() {
 
 // --- Main Application Layout ---
 function MainLayout() {
-  const { isAdmin, isTherapist, patientData, user } = useAuth();
+  const { isAdmin, isTherapist, patientData, role, user } = useAuth();
+  const capabilities = getRoleCapabilities(role);
 
   return (
     <div className="min-h-screen bg-myway-bg flex font-sans text-myway-text">
@@ -104,8 +114,8 @@ function MainLayout() {
             to="/calendar"
           />
 
-          {/* Patients page - admin sees all, patient sees only their sessions */}
-          {isAdmin && (
+          {/* Patient directory - admin manages, therapist reads */}
+          {capabilities.canViewPatients && (
             <NavItem
               icon={<Users size={22} />}
               label="Pacjenci"

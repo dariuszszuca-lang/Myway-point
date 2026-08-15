@@ -153,12 +153,16 @@ export function CalendarPage() {
         ]);
       } else if (isTherapist && appUser?.therapistId) {
         const therapistId = appUser.therapistId;
-        const therapistSessions = await getSessionsByTherapist(therapistId);
+        const [therapistSessions, therapistPatients] = await Promise.all([
+          getSessionsByTherapist(therapistId),
+          getPatients(),
+        ]);
         sessionsData = selectTherapistSessions(therapistSessions, therapistId, {
           startDate: weekStart,
           endDate: weekEnd,
           includeCancelled: true,
         });
+        patientsData = therapistPatients;
       } else if (patientData) {
         // Patient sees only their own sessions
         sessionsData = await getPatientSessionsByDateRange(patientData.id, weekStart, weekEnd);
@@ -1104,9 +1108,7 @@ export function CalendarPage() {
                     </div>
                     {/* Patient contact info */}
                     {(isAdmin || isTherapist) && (() => {
-                      const sessionPatient = isAdmin
-                        ? patients.find(p => p.id === selectedSession.patientId)
-                        : undefined;
+                      const sessionPatient = patients.find(p => p.id === selectedSession.patientId);
                       const contact = getSessionContact(selectedSession, sessionPatient);
                       if (!contact) return null;
                       return (
