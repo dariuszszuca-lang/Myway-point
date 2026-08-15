@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectTherapistSessions } from '../src/auth/sessionAccess.ts';
+import * as sessionAccess from '../src/auth/sessionAccess.ts';
 import type { Session } from '../src/types/index.ts';
+
+const { selectTherapistSessions } = sessionAccess;
 
 const makeSession = (
   id: string,
@@ -63,4 +65,38 @@ test('can retain cancelled sessions for the calendar history', () => {
       .map(session => session.id),
     ['cancelled'],
   );
+});
+
+test('therapist can use contact stored on their session without reading patients', () => {
+  const getSessionContact = Reflect.get(sessionAccess, 'getSessionContact');
+  assert.equal(typeof getSessionContact, 'function');
+  if (typeof getSessionContact !== 'function') return;
+
+  const ownSession = {
+    ...makeSession('own', 'therapist-current', '2026-08-20'),
+    patientEmail: 'patient@example.com',
+    patientPhone: '+48 500 000 000',
+  };
+
+  assert.deepEqual(getSessionContact(ownSession), {
+    email: 'patient@example.com',
+    phone: '+48 500 000 000',
+  });
+});
+
+test('administrator sees current patient contact with session snapshot as fallback', () => {
+  const getSessionContact = Reflect.get(sessionAccess, 'getSessionContact');
+  assert.equal(typeof getSessionContact, 'function');
+  if (typeof getSessionContact !== 'function') return;
+
+  const oldSession = makeSession('own', 'therapist-current', '2026-08-20');
+  const currentPatient = {
+    email: 'current@example.com',
+    phone: '+48 511 111 111',
+  };
+  assert.deepEqual(getSessionContact(oldSession, currentPatient), {
+    email: 'current@example.com',
+    phone: '+48 511 111 111',
+  });
+  assert.equal(getSessionContact(oldSession), null);
 });

@@ -21,7 +21,7 @@ import { getAvailability, isTimeSlotAvailableWithOverrides } from '../services/a
 import { getOverrides, addOverride, deleteOverride } from '../services/overrideService';
 import { Session, Therapist, Patient, Availability, AvailabilityOverride, WORKING_HOURS, CreateSessionData } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { selectTherapistSessions } from '../auth/sessionAccess';
+import { getSessionContact, selectTherapistSessions } from '../auth/sessionAccess';
 import { canLoadTherapistSchedule, getRoleCapabilities } from '../auth/accessPolicy';
 
 const DAYS = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Ndz'];
@@ -355,6 +355,8 @@ export function CalendarPage() {
     if (!isAdmin && patientData) {
       sessionData.patientId = patientData.id;
       sessionData.patientName = patientData.name;
+      sessionData.patientEmail = patientData.email ?? null;
+      sessionData.patientPhone = patientData.phone ?? null;
     }
 
     setNewSessionData(sessionData);
@@ -369,6 +371,7 @@ export function CalendarPage() {
 
   const openEditSessionModal = (session: Session) => {
     if (!capabilities.canManageSessions) return;
+    const patient = patients.find(item => item.id === session.patientId);
     setModalMode('edit');
     setSelectedSession(session);
     setNewSessionData({
@@ -379,6 +382,8 @@ export function CalendarPage() {
       therapistName: session.therapistName,
       patientId: session.patientId,
       patientName: session.patientName,
+      patientEmail: patient?.email ?? session.patientEmail ?? null,
+      patientPhone: patient?.phone ?? session.patientPhone ?? null,
       notes: session.notes || '',
     });
     setIsModalOpen(true);
@@ -426,6 +431,8 @@ export function CalendarPage() {
         therapistName: newSessionData.therapistName,
         patientId: newSessionData.patientId,
         patientName: newSessionData.patientName,
+        patientEmail: newSessionData.patientEmail ?? null,
+        patientPhone: newSessionData.patientPhone ?? null,
         notes: newSessionData.notes,
       });
       setIsModalOpen(false);
@@ -945,6 +952,8 @@ export function CalendarPage() {
                             ...prev,
                             patientId: e.target.value,
                             patientName: patient?.name,
+                            patientEmail: patient?.email ?? null,
+                            patientPhone: patient?.phone ?? null,
                           }));
                         }}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-myway-primary/20 text-base"
@@ -1094,20 +1103,23 @@ export function CalendarPage() {
                       </div>
                     </div>
                     {/* Patient contact info */}
-                    {isAdmin && (() => {
-                      const sessionPatient = patients.find(p => p.id === selectedSession.patientId);
-                      if (!sessionPatient?.email && !sessionPatient?.phone) return null;
+                    {(isAdmin || isTherapist) && (() => {
+                      const sessionPatient = isAdmin
+                        ? patients.find(p => p.id === selectedSession.patientId)
+                        : undefined;
+                      const contact = getSessionContact(selectedSession, sessionPatient);
+                      if (!contact) return null;
                       return (
                         <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 space-y-1.5">
                           <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Dane kontaktowe</p>
-                          {sessionPatient?.email && (
-                            <a href={`mailto:${sessionPatient.email}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
-                              <Mail size={14} />{sessionPatient.email}
+                          {contact.email && (
+                            <a href={`mailto:${contact.email}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                              <Mail size={14} />{contact.email}
                             </a>
                           )}
-                          {sessionPatient?.phone && (
-                            <a href={`tel:${sessionPatient.phone}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
-                              <Phone size={14} />{sessionPatient.phone}
+                          {contact.phone && (
+                            <a href={`tel:${contact.phone}`} className="flex items-center gap-2 text-sm text-blue-700 hover:underline">
+                              <Phone size={14} />{contact.phone}
                             </a>
                           )}
                         </div>

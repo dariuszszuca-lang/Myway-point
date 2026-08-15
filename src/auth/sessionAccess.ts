@@ -1,4 +1,4 @@
-import type { Session } from '../types';
+import type { Patient, Session } from '../types';
 
 export interface SessionRange {
   startDate?: string;
@@ -18,3 +18,24 @@ export const selectTherapistSessions = (
   .sort((left, right) =>
     (left.date + ' ' + left.startTime).localeCompare(right.date + ' ' + right.startTime)
   );
+
+export interface SessionContact {
+  email?: string;
+  phone?: string;
+}
+
+const normalizedContactValue = (value: string | null | undefined): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized || undefined;
+};
+
+export const getSessionContact = (
+  session: Pick<Session, 'patientEmail' | 'patientPhone'>,
+  patient?: Pick<Patient, 'email' | 'phone'>,
+): SessionContact | null => {
+  const email = normalizedContactValue(patient?.email) ?? normalizedContactValue(session.patientEmail);
+  const phone = normalizedContactValue(patient?.phone) ?? normalizedContactValue(session.patientPhone);
+
+  return email || phone ? { email, phone } : null;
+};

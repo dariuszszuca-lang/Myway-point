@@ -19,7 +19,7 @@ import {
 
 let testEnv;
 
-const session = (therapistId, patientId) => ({
+const session = (therapistId, patientId, contact = {}) => ({
   patientId,
   patientName: 'Pacjent testowy',
   therapistId,
@@ -30,6 +30,7 @@ const session = (therapistId, patientId) => ({
   status: 'scheduled',
   createdAt: 1,
   updatedAt: 1,
+  ...contact,
 });
 
 before(async () => {
@@ -95,7 +96,10 @@ beforeEach(async () => {
       therapistId: null,
       createdAt: 1,
     });
-    await setDoc(doc(db, 'sessions/own-session'), session('therapist-current', 'patient-1'));
+    await setDoc(doc(db, 'sessions/own-session'), session('therapist-current', 'patient-1', {
+      patientEmail: 'patient@example.com',
+      patientPhone: '+48 500 000 000',
+    }));
     await setDoc(doc(db, 'sessions/foreign-session'), session('therapist-foreign', 'patient-2'));
     await setDoc(doc(db, 'patients/patient-1'), {
       name: 'Pacjent testowy',
@@ -157,6 +161,8 @@ test('therapist query returns only own sessions', async () => {
   const snapshot = await assertSucceeds(getDocs(ownSessions));
   assert.equal(snapshot.size, 1);
   assert.equal(snapshot.docs[0].id, 'own-session');
+  assert.equal(snapshot.docs[0].data().patientEmail, 'patient@example.com');
+  assert.equal(snapshot.docs[0].data().patientPhone, '+48 500 000 000');
   await assertFails(getDoc(doc(db, 'sessions/foreign-session')));
   await assertFails(getDocs(collection(db, 'sessions')));
 });
@@ -188,7 +194,17 @@ test('patient can still read only their own sessions', async () => {
   await assertSucceeds(getDoc(doc(db, 'patients/patient-1')));
   await assertSucceeds(setDoc(
     doc(db, 'sessions/patient-created-session'),
-    session('therapist-current', 'patient-1'),
+    session('therapist-current', 'patient-1', {
+      patientEmail: 'patient@example.com',
+      patientPhone: null,
+    }),
+  ));
+  await assertFails(setDoc(
+    doc(db, 'sessions/patient-spoofed-contact'),
+    session('therapist-current', 'patient-1', {
+      patientEmail: 'other@example.com',
+      patientPhone: null,
+    }),
   ));
   await assertSucceeds(updateDoc(doc(db, 'sessions/patient-created-session'), {
     status: 'cancelled',

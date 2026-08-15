@@ -26,6 +26,8 @@ export interface Session {
   id: string;
   patientId: string;
   patientName: string; // Denormalized for quick display
+  patientEmail?: string | null; // Snapshot visible only through the assigned session
+  patientPhone?: string | null; // Snapshot visible only through the assigned session
   therapistId: string;
   therapistName: string; // Denormalized for quick display
   date: string; // YYYY-MM-DD
@@ -76,6 +78,8 @@ export interface AvailabilityOverride {
 export interface CreateSessionData {
   patientId: string;
   patientName: string;
+  patientEmail?: string | null;
+  patientPhone?: string | null;
   therapistId: string;
   therapistName: string;
   date: string;

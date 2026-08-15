@@ -146,6 +146,8 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
         'patientId',
         'patientName',
+        'patientEmail',
+        'patientPhone',
         'therapistId',
         'therapistName',
         'date',
@@ -156,6 +158,19 @@ service cloud.firestore {
         'createdAt',
         'updatedAt'
       ]);
+    }
+
+    function validPatientContactSnapshot() {
+      let patient = get(
+        /databases/$(database)/documents/patients/$(request.resource.data.patientId)
+      ).data;
+      return (
+          !request.resource.data.keys().hasAny(['patientEmail']) ||
+          request.resource.data.get('patientEmail', null) == patient.get('email', null)
+        ) && (
+          !request.resource.data.keys().hasAny(['patientPhone']) ||
+          request.resource.data.get('patientPhone', null) == patient.get('phone', null)
+        );
     }
 
     function validBookedSlotKeys() {
@@ -253,6 +268,7 @@ service cloud.firestore {
       // Pacjent może tworzyć rezerwację tylko dla siebie
       allow create: if isPatient() &&
         validSessionKeys() &&
+        validPatientContactSnapshot() &&
         request.resource.data.status == 'scheduled' &&
         request.resource.data.patientId == signedInUser().patientId;
       // Pacjent może odwołać swoją własną wizytę (zmiana statusu na 'cancelled')
