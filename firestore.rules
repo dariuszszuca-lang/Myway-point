@@ -215,10 +215,12 @@ service cloud.firestore {
       allow read, write: if isAdmin();
       // Znany terapeuta ma stały dostęp tylko do odczytu całej bazy pacjentów
       allow read: if isTherapist();
-      // Pacjent może czytać tylko swój rekord (powiązany przez email lub patientId w users)
-      allow read: if isPatient() &&
-        ((hasAuthEmail() && resource.data.email == authEmail()) ||
-         signedInUser().patientId == patientId);
+      // Pacjent czyta swój rekord po własnym, zweryfikowanym mailu. Ta ścieżka działa
+      // TAKŻE przy pierwszym logowaniu, zanim powstanie dokument users (findPatientByEmail
+      // w ensureUserExists). Bez niej nowy pacjent nie mógłby dokończyć rejestracji.
+      allow read: if hasAuthEmail() && resource.data.email == authEmail();
+      // Odczyt po powiązaniu users.patientId (gdy dokument users już istnieje).
+      allow read: if isPatient() && signedInUser().patientId == patientId;
     }
 
     // THERAPISTS - terapeuci

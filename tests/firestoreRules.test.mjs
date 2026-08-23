@@ -229,3 +229,24 @@ test('admin retains full session access', async () => {
     updatedAt: 2,
   }));
 });
+
+// Regresja: nowy pacjent przy PIERWSZYM logowaniu nie ma jeszcze dokumentu users.
+// ensureUserExists musi móc znaleźć jego rekord patients po mailu (findPatientByEmail),
+// inaczej rejestracja się wywala i pacjent nie może rezerwować (incydent 23.08.2026).
+test('new patient without a users doc can read own patient record by email (bootstrap)', async () => {
+  const db = testEnv.authenticatedContext('brand-new-patient', {
+    email: 'patient@example.com',
+  }).firestore();
+
+  // findPatientByEmail: query po mailu musi przejść mimo braku users doc
+  const ownByEmail = query(
+    collection(db, 'patients'),
+    where('email', '==', 'patient@example.com'),
+  );
+  const snapshot = await assertSucceeds(getDocs(ownByEmail));
+  assert.equal(snapshot.size, 1);
+  await assertSucceeds(getDoc(doc(db, 'patients/patient-1')));
+
+  // ale nie może czytać cudzego rekordu pacjenta
+  await assertFails(getDoc(doc(db, 'patients/patient-therapist-email')));
+});
