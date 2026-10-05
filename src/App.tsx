@@ -217,7 +217,7 @@ function MainLayout() {
           </div>
         </header>
 
-        <div className="p-8 max-w-7xl mx-auto w-full">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
           <Outlet />
         </div>
       </main>

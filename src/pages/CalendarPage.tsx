@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import {
@@ -585,6 +585,15 @@ export function CalendarPage() {
 
   const getTherapistIndex = (id: string) => therapists.findIndex(t => t.id === id);
 
+  // Wąski ekran: po załadowaniu tygodnia przewiń siatkę tak, żeby dzisiejszy dzień był pierwszy od lewej.
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = gridScrollRef.current;
+    if (!el) return;
+    const todayIdx = weekDays.findIndex(day => isSameDay(day, new Date()));
+    el.scrollLeft = todayIdx > 0 ? (el.scrollWidth / 8) * todayIdx : 0;
+  }, [loading, weekDays]);
+
   if (isTherapist && !therapistScheduleReady) {
     return (
       <div className="max-w-xl mx-auto mt-12 p-6 bg-amber-50 border border-amber-200 rounded-2xl">
@@ -701,9 +710,15 @@ export function CalendarPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-soft overflow-hidden">
+          {/* Na telefonie siatka przewija się w bok, żeby pola dało się kliknąć */}
+          <p className="md:hidden px-4 py-2 text-xs text-slate-500 border-b border-slate-100">
+            Przesuń palcem w bok, aby zobaczyć kolejne dni.
+          </p>
+          <div className="overflow-x-auto" ref={gridScrollRef}>
+          <div className="min-w-[600px]">
           {/* Days header */}
           <div className="grid grid-cols-8 border-b border-slate-200">
-            <div className="p-4 bg-slate-50 border-r border-slate-200">
+            <div className="p-4 bg-slate-50 border-r border-slate-200 sticky left-0 z-10">
               <Clock size={18} className="text-slate-400" />
             </div>
             {weekDays.map((day, idx) => {
@@ -753,11 +768,11 @@ export function CalendarPage() {
           </div>
 
           {/* Time slots */}
-          <div className="max-h-[600px] overflow-y-auto">
+          <div className="md:max-h-[600px] md:overflow-y-auto">
             {TIME_SLOTS.map((time) => (
               <div key={time} className="grid grid-cols-8 border-b border-slate-100 last:border-b-0">
                 {/* Time label */}
-                <div className="p-3 border-r border-slate-100 text-sm font-medium text-slate-500 bg-slate-50/50">
+                <div className="p-3 border-r border-slate-100 text-sm font-medium text-slate-500 bg-[#fcfdfe] sticky left-0 z-10">
                   {time}
                 </div>
 
@@ -826,6 +841,8 @@ export function CalendarPage() {
                 })}
               </div>
             ))}
+          </div>
+          </div>
           </div>
         </div>
       )}
