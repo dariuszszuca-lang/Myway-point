@@ -183,8 +183,8 @@ function getWelcomeEmailHtml(firstName, packageType, startDate, endDate, detoksP
   };
   const packageName = packageNames[packageType] || `Pakiet ${packageType}`;
   const detoksInfo = {
-    "1day": { label: "Detoks 1 dzień", amount: "1 000 zł" },
-    "3days": { label: "Detoks 3 dni", amount: "2 700 zł" },
+    "1day": { label: "Detoks 1 dzień", amount: "1 200 zł" },
+    "3days": { label: "Detoks 3 dni", amount: "3 600 zł" },
   }[detoksPackage];
 
   return `<!DOCTYPE html>
@@ -318,9 +318,9 @@ function getWelcomeEmailPlain(firstName, packageType, startDate, detoksPackage) 
   };
   const packageName = packageNames[packageType] || `Pakiet ${packageType}`;
   const detoksLine = detoksPackage === "1day"
-    ? "\nUsługa dodatkowa: Detoks 1 dzień (1 000 zł) — przed rozpoczęciem terapii.\n"
+    ? "\nUsługa dodatkowa: Detoks 1 dzień (1 200 zł) — przed rozpoczęciem terapii.\n"
     : detoksPackage === "3days"
-      ? "\nUsługa dodatkowa: Detoks 3 dni (2 700 zł) — przed rozpoczęciem terapii.\n"
+      ? "\nUsługa dodatkowa: Detoks 3 dni (3 600 zł) — przed rozpoczęciem terapii.\n"
       : "";
   return `Cześć ${firstName}!\n\nPotwierdzamy Twój termin w Ośrodku My Way.\n\nWariant terapii: ${packageName}\n${startDate ? `Data przyjazdu: ${startDate}\n` : ""}${detoksLine}\nCo spakować:\n- Środki higieny osobistej\n- Ręcznik\n- Ubrania na min. 7 dni\n- Strój sportowy\n- Obuwie + klapki\n- Kurtka\n- Laptop i telefon\n- Dowód osobisty\n- Ulubione lub aktualnie czytane książki\n- Leki i suplementy (zapas + dawkowanie, przekaż terapeucie)\n- Papierosy (dostęp do sklepu ograniczony regulaminem)\n${(packageType === "3" || packageType === "6tyg_roz" || packageType === "8tyg_roz") ? `\nBonus w Twoim pakiecie:\nTwój pakiet zawiera dodatkowe konsultacje indywidualne (online lub na miejscu).\n` : ""}${getAppSectionPlain("welcome")}\nMasz pytania? Dzwoń: 731 395 295\n\nDo zobaczenia!\nEkipa My Way\nosrodek-myway.pl`;
 }
