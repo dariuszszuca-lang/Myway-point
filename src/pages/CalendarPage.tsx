@@ -550,7 +550,7 @@ export function CalendarPage() {
 
   const handleStatusChange = async (sessionId: string, newStatus: Session['status']) => {
     // Pacjent może tylko odwołać swoją zaplanowaną wizytę (serwer sprawdza, czy wizyta jest jego).
-    const odwolanieWlasnej = newStatus === 'cancelled' && selectedSession?.status === 'scheduled';
+    const odwolanieWlasnej = role === 'patient' && newStatus === 'cancelled' && selectedSession?.status === 'scheduled';
     if (!capabilities.canManageSessions && !odwolanieWlasnej) return;
     try {
       const previousStatus = selectedSession?.status;

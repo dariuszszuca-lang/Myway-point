@@ -1,0 +1,49 @@
+/* Wspólny wygląd instrukcji MyWay Point (pacjent i zespół). Druk: A4, Chrome „Zapisz jako PDF”. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root { --morski:#0f766e; --gleboki:#134e4a; --mieta:#ecfdf5; --tusz:#0f172a; --szary:#64748b; --linia:#e2e8f0; --uwaga:#fef3c7; --uwaga-tusz:#78350f; }
+* { box-sizing:border-box; }
+@page { size:A4; margin:11mm 14mm 11mm; }
+html { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+body { margin:0; font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif; color:var(--tusz); font-size:10pt; line-height:1.45; background:#fff; }
+.kartka { max-width:180mm; margin:0 auto; padding:0; }
+@media screen { body { background:#f1f5f9; } .kartka { background:#fff; padding:14mm 15mm; margin:10mm auto; box-shadow:0 2px 20px rgba(15,23,42,.08); } }
+header.okladka { background:linear-gradient(135deg,var(--gleboki),var(--morski)); color:#fff; border-radius:14px; padding:22px 26px 24px; }
+.okladka .marka { display:flex; align-items:center; gap:10px; font-weight:700; font-size:11pt; letter-spacing:.01em; opacity:.95; }
+.okladka .znak { width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.16); display:grid; place-items:center; }
+.okladka h1 { font-size:25pt; line-height:1.12; margin:18px 0 6px; font-weight:800; letter-spacing:-.02em; }
+.okladka p { margin:0; font-size:11.5pt; opacity:.92; }
+.okladka .stan { margin-top:14px; font-size:8.6pt; opacity:.8; }
+.skrot { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0 4px; }
+.skrot div { border:1px solid var(--linia); border-radius:12px; padding:11px 13px; font-size:9.8pt; }
+.skrot b { display:block; color:var(--morski); font-size:8.4pt; text-transform:uppercase; letter-spacing:.08em; margin-bottom:3px; }
+h2 { font-size:14.5pt; margin:18px 0 4px; letter-spacing:-.01em; break-after:avoid; }
+h2 small { display:block; font-size:9.6pt; font-weight:500; color:var(--szary); letter-spacing:0; margin-top:2px; }
+h3 { font-size:11pt; margin:16px 0 4px; break-after:avoid; }
+p { margin:6px 0; }
+section { break-inside:auto; }
+.dwa { display:grid; grid-template-columns:1fr 43mm; gap:9mm; align-items:start; break-inside:avoid; }
+.dwa.szer { grid-template-columns:1fr; gap:3mm; }
+ol.kroki { list-style:none; counter-reset:k; margin:8px 0 0; padding:0; }
+ol.kroki li { counter-increment:k; position:relative; padding:0 0 7px 34px; break-inside:avoid; }
+ol.kroki li::before { content:counter(k); position:absolute; left:0; top:0; width:23px; height:23px; border-radius:50%; background:var(--morski); color:#fff; font-weight:700; font-size:9.4pt; display:grid; place-items:center; }
+ol.kroki li b:first-child { display:block; }
+ul { margin:6px 0; padding-left:18px; } ul li { margin:3px 0; }
+.klawisz { display:inline-block; background:var(--mieta); color:var(--gleboki); border:1px solid #a7f3d0; border-radius:6px; padding:0 6px; font-weight:600; font-size:9.6pt; white-space:nowrap; }
+figure { margin:0; break-inside:avoid; }
+figure img { width:100%; max-height:72mm; object-fit:contain; object-position:top; display:block; border:1px solid var(--linia); border-radius:12px; }
+figure.telefon img { max-height:none; border:5px solid var(--tusz); border-radius:20px; }
+figcaption { font-size:8.4pt; color:var(--szary); margin-top:5px; text-align:center; }
+.uwaga, .dobrze { border-radius:10px; padding:10px 13px; margin:10px 0; font-size:9.9pt; break-inside:avoid; }
+.uwaga { background:var(--uwaga); color:var(--uwaga-tusz); } .dobrze { background:var(--mieta); color:var(--gleboki); }
+.zasady { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:10px 0; break-inside:avoid; }
+.zasady div { background:var(--mieta); border-radius:12px; padding:12px 13px; font-size:9.6pt; color:var(--gleboki); }
+.zasady strong { display:block; font-size:17pt; line-height:1.1; color:var(--morski); letter-spacing:-.02em; margin-bottom:3px; }
+table { width:100%; border-collapse:collapse; font-size:9.6pt; margin:8px 0; break-inside:avoid; }
+th { text-align:left; font-size:8.2pt; text-transform:uppercase; letter-spacing:.07em; color:var(--szary); border-bottom:2px solid var(--linia); padding:6px 8px; }
+td { border-bottom:1px solid var(--linia); padding:7px 8px; vertical-align:top; }
+td.tak { color:var(--morski); font-weight:700; } td.nie { color:#94a3b8; }
+dl.pytania dt { font-weight:700; margin-top:8px; } dl.pytania dd { margin:2px 0 0; } dl.pytania div { break-inside:avoid; }
+footer.kontakt { margin-top:16px; border-top:2px solid var(--morski); padding-top:12px; font-size:9.8pt; display:grid; grid-template-columns:1fr 1fr; gap:10px; break-inside:avoid; }
+footer.kontakt b { color:var(--morski); }
+footer.kontakt .stopka { font-weight:600; }
+.nowa-strona { break-before:page; }
