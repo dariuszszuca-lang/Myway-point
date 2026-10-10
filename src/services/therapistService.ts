@@ -1,91 +1,32 @@
-import { db } from '../firebaseConfig';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { Therapist, DEFAULT_THERAPISTS } from '../types';
-import { initializeDefaultAvailability, deleteAvailabilityByTherapist, getAvailabilityByTherapist } from './availabilityService';
+import { api, wybierz } from '../aws/api';
+import { Therapist } from '../types';
 
-const therapistsCollectionRef = collection(db, 'therapists');
+// Terapeuci idą przez API rezerwacji na AWS (zapis tylko administrator).
+// Listą terapeutów zarządza administrator. Ekran nie dodaje już nikogo sam przy starcie (decyzja D6).
+
+const POLA_TERAPEUTY = ['name', 'specialization', 'color', 'avatar', 'active'];
 
 export const getTherapists = async (): Promise<Therapist[]> => {
-  const q = query(therapistsCollectionRef, orderBy('name', 'asc'));
-  const data = await getDocs(q);
-  const therapists = data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Therapist[];
-
-  // If no therapists exist, initialize with defaults
-  if (therapists.length === 0) {
-    await initializeDefaultTherapists();
-    return getTherapists();
-  }
-
-  return therapists;
+  return (await api<{ terapeuci: Therapist[] }>('GET', '/terapeuci')).terapeuci;
 };
 
-export const initializeDefaultTherapists = async (): Promise<void> => {
-  for (const therapist of DEFAULT_THERAPISTS) {
-    const docRef = await addDoc(therapistsCollectionRef, therapist);
-    // Initialize default availability for this therapist
-    await initializeDefaultAvailability(docRef.id, therapist.name);
-  }
-};
-
-export const ensureDefaultTherapistsExist = async (): Promise<void> => {
-  const existingTherapists = await getDocs(therapistsCollectionRef);
-  const existingByName = new Map(
-    existingTherapists.docs.map(doc => [String(doc.data().name || '').trim().toLowerCase(), doc.id])
-  );
-
-  for (const therapist of DEFAULT_THERAPISTS) {
-    const normalizedName = therapist.name.trim().toLowerCase();
-    let therapistId = existingByName.get(normalizedName);
-
-    if (!therapistId) {
-      const docRef = await addDoc(therapistsCollectionRef, therapist);
-      await initializeDefaultAvailability(docRef.id, therapist.name);
-      therapistId = docRef.id;
-      existingByName.set(normalizedName, therapistId);
-    }
-  }
-};
-
-// Reset and reinitialize therapists with defaults
-export const resetTherapistsToDefault = async (): Promise<void> => {
-  // Delete all existing therapists
-  const existingTherapists = await getDocs(therapistsCollectionRef);
-  for (const doc of existingTherapists.docs) {
-    await deleteDoc(doc.ref);
-  }
-  // Add default therapists
-  await initializeDefaultTherapists();
-};
-
-// Ensure correct therapists exist (call on app init)
-export const ensureTherapistsExist = async (): Promise<void> => {
-  const data = await getDocs(therapistsCollectionRef);
-  const therapists = data.docs.map(doc => doc.data());
-
-  // Init only when database is empty. Admin manages the list manually after that.
-  if (therapists.length === 0) {
-    await resetTherapistsToDefault();
-    return;
-  }
-
-  await ensureDefaultTherapistsExist();
-};
+// Zostają puste dla zgodności z ekranami, które je wołają przy starcie.
+export const initializeDefaultTherapists = async (): Promise<void> => {};
+export const ensureDefaultTherapistsExist = async (): Promise<void> => {};
+export const ensureTherapistsExist = async (): Promise<void> => {};
+export const initializeAvailabilityForExistingTherapists = async (): Promise<void> => {};
 
 export const addTherapist = async (therapistData: Omit<Therapist, 'id'>): Promise<Therapist> => {
-  const docRef = await addDoc(therapistsCollectionRef, therapistData);
-  return { ...therapistData, id: docRef.id };
+  return (await api<{ terapeuta: Therapist }>('POST', '/terapeuci', wybierz(therapistData, POLA_TERAPEUTY))).terapeuta;
 };
 
 export const updateTherapist = async (id: string, therapistData: Partial<Therapist>): Promise<void> => {
-  const therapistDoc = doc(db, 'therapists', id);
-  await updateDoc(therapistDoc, therapistData);
+  await api('PUT', `/terapeuci/${id}`, wybierz(therapistData, POLA_TERAPEUTY));
 };
 
+// Serwer usuwa terapeutę razem z jego godzinami i zmianami na dzień.
 export const deleteTherapist = async (id: string): Promise<void> => {
-  // Delete therapist's availability first
-  await deleteAvailabilityByTherapist(id);
-  const therapistDoc = doc(db, 'therapists', id);
-  await deleteDoc(therapistDoc);
+  await api('DELETE', `/terapeuci/${id}`);
 };
 
 // Therapist colors for calendar
@@ -110,17 +51,6 @@ export const getTherapistColor = (index: number) => {
   }
 
   return THERAPIST_COLORS[index % THERAPIST_COLORS.length];
-};
-
-// Initialize availability for existing therapists (one-time setup)
-export const initializeAvailabilityForExistingTherapists = async (): Promise<void> => {
-  const therapists = await getTherapists();
-  for (const therapist of therapists) {
-    const existingAvailability = await getAvailabilityByTherapist(therapist.id);
-    if (existingAvailability.length === 0) {
-      await initializeDefaultAvailability(therapist.id, therapist.name);
-    }
-  }
 };
 
 // Re-export availability functions for convenience

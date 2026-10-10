@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus, CheckCircle, User } from 'lucide-react';
+import { signIn, signUp, confirmSignUp, resendCode, forgotPassword, confirmForgotPassword, AuthError } from '../aws/cognito';
+import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus, CheckCircle, User, KeyRound } from 'lucide-react';
+
+// zwykly = logowanie albo rejestracja; kod = kod z maila po rejestracji;
+// reset = prośba o kod do zmiany hasła; reset-kod = kod i nowe hasło
+type Tryb = 'zwykly' | 'kod' | 'reset' | 'reset-kod';
 import { useAuth } from '../context/AuthContext';
 
 export function LoginPage() {
@@ -15,7 +19,8 @@ export function LoginPage() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  const auth = getAuth();
+  const [tryb, setTryb] = useState<Tryb>('zwykly');
+  const [kod, setKod] = useState('');
 
   // Jeśli użytkownik jest zalogowany, przekieruj do dashboardu
   if (user) {
@@ -28,55 +33,111 @@ export function LoginPage() {
     setError('');
     setSuccess('');
 
-    if (isRegister) {
-      // Rejestracja - walidacja
-      if (!firstName.trim() || !lastName.trim()) {
-        setError('Podaj imię i nazwisko');
-        setLoading(false);
-        return;
+    try {
+      if (tryb === 'kod') {
+        // Kod z maila po rejestracji, potem od razu logowanie
+        await confirmSignUp(email, kod);
+        await signIn(email, password);
+      } else if (tryb === 'reset') {
+        await forgotPassword(email);
+        setTryb('reset-kod');
+        setSuccess('Jeśli konto istnieje, wysłaliśmy kod na ten adres e-mail.');
+      } else if (tryb === 'reset-kod') {
+        if (password !== confirmPassword) {
+          setError('Hasła nie są identyczne');
+          setLoading(false);
+          return;
+        }
+        if (password.length < 6) {
+          setError('Hasło musi mieć minimum 6 znaków');
+          setLoading(false);
+          return;
+        }
+        await confirmForgotPassword(email, kod, password);
+        await signIn(email, password);
+      } else if (isRegister) {
+        // Rejestracja - walidacja
+        if (!firstName.trim() || !lastName.trim()) {
+          setError('Podaj imię i nazwisko');
+          setLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Hasła nie są identyczne');
+          setLoading(false);
+          return;
+        }
+        if (password.length < 6) {
+          setError('Hasło musi mieć minimum 6 znaków');
+          setLoading(false);
+          return;
+        }
+        const odRazuCzynne = await signUp(email, password, `${firstName.trim()} ${lastName.trim()}`);
+        if (odRazuCzynne) {
+          setSuccess('Konto utworzone! Przekierowuję do panelu...');
+          // Przekierowanie nastąpi automatycznie przez sprawdzenie user w useAuth
+          await signIn(email, password);
+        } else {
+          setKod('');
+          setTryb('kod');
+          setSuccess('Wysłaliśmy kod na Twój adres e-mail. Wpisz go poniżej.');
+        }
+      } else {
+        // Logowanie
+        await signIn(email, password);
       }
-      if (password !== confirmPassword) {
-        setError('Hasła nie są identyczne');
-        setLoading(false);
-        return;
-      }
-      if (password.length < 6) {
-        setError('Hasło musi mieć minimum 6 znaków');
-        setLoading(false);
-        return;
-      }
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Ustaw displayName (imię i nazwisko)
-        await updateProfile(userCredential.user, {
-          displayName: `${firstName.trim()} ${lastName.trim()}`
-        });
-        setSuccess('Konto utworzone! Przekierowuję do panelu...');
-        // Przekierowanie nastąpi automatycznie przez sprawdzenie user w useAuth
-      } catch (err: any) {
-        if (err.code === 'auth/email-already-in-use') {
+    } catch (err: any) {
+      const code = err instanceof AuthError ? err.code : '';
+      if (code === 'siec') {
+        setError('Brak połączenia. Spróbuj ponownie');
+      } else if (code === 'UserNotConfirmedException') {
+        // Konto czeka na kod z maila: wysyłamy nowy i pokazujemy pole na kod
+        await resendCode(email).catch(() => null);
+        setKod('');
+        setTryb('kod');
+        setSuccess('Wysłaliśmy kod na Twój adres e-mail. Wpisz go poniżej.');
+      } else if (code === 'CodeMismatchException' || code === 'ExpiredCodeException') {
+        setError('Nieprawidłowy albo przeterminowany kod');
+      } else if (code === 'LimitExceededException' || code === 'TooManyRequestsException') {
+        setError('Za dużo prób. Spróbuj ponownie za kilka minut');
+      } else if (tryb === 'reset' || tryb === 'reset-kod') {
+        setError('Nie udało się zmienić hasła. Spróbuj ponownie');
+      } else if (tryb === 'kod') {
+        setError('Nie udało się potwierdzić konta. Spróbuj ponownie');
+      } else if (isRegister) {
+        if (code === 'UsernameExistsException' || code === 'UserLambdaValidationException') {
           setError('Ten e-mail jest już zarejestrowany');
-        } else if (err.code === 'auth/invalid-email') {
+        } else if (code === 'InvalidParameterException') {
           setError('Nieprawidłowy adres e-mail');
+        } else if (code === 'InvalidPasswordException') {
+          setError('Hasło musi mieć minimum 6 znaków');
         } else {
           setError('Błąd rejestracji. Spróbuj ponownie');
         }
-        console.error(err);
-      }
-    } else {
-      // Logowanie
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (err: any) {
+      } else {
         setError('Nieprawidłowy e-mail lub hasło');
-        console.error(err);
       }
+      console.error(code || 'blad logowania');
     }
     setLoading(false);
   };
 
+  const startReset = () => {
+    setTryb('reset');
+    setIsRegister(false);
+    setKod('');
+    setPassword('');
+    setConfirmPassword('');
+    setError('');
+    setSuccess('');
+  };
+
   const toggleMode = () => {
-    setIsRegister(!isRegister);
+    // Z kroków z kodem przycisk wraca do logowania
+    setIsRegister(tryb === 'zwykly' ? !isRegister : false);
+    setTryb('zwykly');
+    setKod('');
+    setPassword('');
     setError('');
     setSuccess('');
     setConfirmPassword('');
@@ -103,17 +164,23 @@ export function LoginPage() {
           {/* Welcome text */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-slate-800 mb-2">
-              {isRegister ? 'Utwórz konto' : 'Witaj ponownie'}
+              {tryb === 'kod' ? 'Potwierdź adres e-mail' : tryb !== 'zwykly' ? 'Ustaw nowe hasło' : isRegister ? 'Utwórz konto' : 'Witaj ponownie'}
             </h2>
             <p className="text-slate-500">
-              {isRegister ? 'Zarejestruj się w systemie' : 'Zaloguj się do panelu terapeuty'}
+              {tryb === 'kod'
+                ? 'Wpisz kod, który wysłaliśmy na Twój adres'
+                : tryb === 'reset'
+                  ? 'Podaj adres e-mail, wyślemy kod'
+                  : tryb === 'reset-kod'
+                    ? 'Wpisz kod z maila i nowe hasło'
+                    : isRegister ? 'Zarejestruj się w systemie' : 'Zaloguj się do panelu terapeuty'}
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Imię i Nazwisko - tylko przy rejestracji */}
-            {isRegister && (
+            {isRegister && tryb === 'zwykly' && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -159,14 +226,37 @@ export function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="twoj@email.pl"
                   className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-myway-primary/20 focus:border-myway-primary transition-all"
+                  readOnly={tryb === 'kod' || tryb === 'reset-kod'}
                   required
                 />
               </div>
             </div>
 
+            {(tryb === 'kod' || tryb === 'reset-kod') && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Kod z maila
+                </label>
+                <div className="relative">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={kod}
+                    onChange={(e) => setKod(e.target.value)}
+                    placeholder="123456"
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-myway-primary/20 focus:border-myway-primary transition-all"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            {(tryb === 'zwykly' || tryb === 'reset-kod') && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Hasło
+                {tryb === 'reset-kod' ? 'Nowe hasło' : 'Hasło'}
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -179,9 +269,21 @@ export function LoginPage() {
                   required
                 />
               </div>
+              {tryb === 'zwykly' && !isRegister && (
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={startReset}
+                    className="text-sm text-slate-500 hover:text-myway-primary transition-colors"
+                  >
+                    Nie pamiętasz hasła?
+                  </button>
+                </div>
+              )}
             </div>
+            )}
 
-            {isRegister && (
+            {((isRegister && tryb === 'zwykly') || tryb === 'reset-kod') && (
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Powtórz hasło
@@ -221,11 +323,17 @@ export function LoginPage() {
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {isRegister ? 'Rejestracja...' : 'Logowanie...'}
+                  {tryb !== 'zwykly' ? 'Chwileczkę...' : isRegister ? 'Rejestracja...' : 'Logowanie...'}
                 </>
               ) : (
                 <>
-                  {isRegister ? (
+                  {tryb === 'kod' ? (
+                    <>Potwierdź</>
+                  ) : tryb === 'reset' ? (
+                    <>Wyślij kod</>
+                  ) : tryb === 'reset-kod' ? (
+                    <>Ustaw hasło i zaloguj</>
+                  ) : isRegister ? (
                     <>
                       <UserPlus className="w-5 h-5" />
                       Zarejestruj się
@@ -248,7 +356,9 @@ export function LoginPage() {
               onClick={toggleMode}
               className="text-sm text-slate-500 hover:text-myway-primary transition-colors"
             >
-              {isRegister ? (
+              {tryb !== 'zwykly' ? (
+                <span className="font-semibold text-myway-primary">Wróć do logowania</span>
+              ) : isRegister ? (
                 <>Masz już konto? <span className="font-semibold text-myway-primary">Zaloguj się</span></>
               ) : (
                 <>Nie masz konta? <span className="font-semibold text-myway-primary">Zarejestruj się</span></>

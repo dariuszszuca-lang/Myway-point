@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
-import { app } from '../firebaseConfig';
-import { ensureUserExists, getPatientDataForUser, UserRole, AppUser } from '../services/userService';
+import { onAuthStateChanged, signOut, AuthUser as User } from '../aws/cognito';
+import { ApiError } from '../aws/api';
+import { loadAccount, UserRole, AppUser } from '../services/userService';
 import { Patient } from '../types';
 
 interface AuthContextType {
@@ -33,33 +33,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [patientData, setPatientData] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
-  const auth = getAuth(app);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsubscribe = onAuthStateChanged(async (authUser) => {
+      setUser(authUser);
 
-      if (firebaseUser && firebaseUser.email) {
+      if (authUser && authUser.email) {
         try {
-          // Ensure user document exists and get role (pass displayName from Firebase Auth)
-          const userData = await ensureUserExists(
-            firebaseUser.uid,
-            firebaseUser.email,
-            firebaseUser.displayName
-          );
-          setAppUser(userData);
-
-          // If patient, load patient data
-          if (userData.role === 'patient' && userData.patientId) {
-            const pData = await getPatientDataForUser(userData.patientId);
-            setPatientData(pData);
-          } else {
-            setPatientData(null);
-          }
+          // Rolę, powiązania i rekord pacjenta ustala serwer.
+          const konto = await loadAccount();
+          setAppUser(konto.appUser);
+          setPatientData(konto.appUser.role === 'patient' ? konto.patientData : null);
         } catch (error) {
           console.error('Error loading user data:', error);
           setAppUser(null);
           setPatientData(null);
+          // Serwer nie uznaje sesji: wylogowanie zamiast pustego ekranu.
+          if (error instanceof ApiError && error.status === 401) {
+            await signOut();
+            return;
+          }
         }
       } else {
         setAppUser(null);
@@ -70,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return unsubscribe;
-  }, [auth]);
+  }, []);
 
   const role = appUser?.role ?? null;
   const isAdmin = role === 'admin';

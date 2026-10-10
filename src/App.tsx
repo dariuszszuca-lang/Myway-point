@@ -18,7 +18,7 @@ import {
   User,
   BarChart3
 } from 'lucide-react';
-import { signOut, getAuth } from 'firebase/auth';
+import { signOut } from './aws/cognito';
 import { getRoleCapabilities } from './auth/accessPolicy';
 
 // --- Protected Route ---
@@ -178,7 +178,7 @@ function MainLayout() {
 
         <div className="p-4 border-t border-slate-100">
           <button
-            onClick={() => signOut(getAuth())}
+            onClick={() => signOut()}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group text-slate-500 hover:bg-rose-50 hover:text-rose-600"
           >
             <span className="transition-transform duration-200 group-hover:scale-110"><LogOut size={22} /></span>

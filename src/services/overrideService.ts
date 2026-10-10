@@ -1,20 +1,18 @@
-import { db } from '../firebaseConfig';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { api, wybierz } from '../aws/api';
 import { AvailabilityOverride } from '../types';
 
-const overridesCollectionRef = collection(db, 'availability_overrides');
+// Zmiany dostępności na konkretny dzień idą przez API rezerwacji na AWS (zapis tylko administrator).
+
+const POLA = ['therapistId', 'date', 'type', 'startTime', 'endTime', 'reason'];
 
 // Pobierz wszystkie overrides
 export const getOverrides = async (): Promise<AvailabilityOverride[]> => {
-  const data = await getDocs(overridesCollectionRef);
-  return data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as AvailabilityOverride[];
+  return (await api<{ wyjatki: AvailabilityOverride[] }>('GET', '/wyjatki')).wyjatki;
 };
 
 // Pobierz overrides dla terapeuty
 export const getOverridesByTherapist = async (therapistId: string): Promise<AvailabilityOverride[]> => {
-  const q = query(overridesCollectionRef, where('therapistId', '==', therapistId));
-  const data = await getDocs(q);
-  return data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as AvailabilityOverride[];
+  return (await getOverrides()).filter(o => o.therapistId === therapistId);
 };
 
 // Pobierz override dla konkretnej daty i terapeuty
@@ -28,26 +26,23 @@ export const getOverrideForDate = (
 
 // Dodaj override
 export const addOverride = async (data: Omit<AvailabilityOverride, 'id'>): Promise<AvailabilityOverride> => {
-  const docRef = await addDoc(overridesCollectionRef, data);
-  return { ...data, id: docRef.id };
+  return (await api<{ wyjatek: AvailabilityOverride }>('POST', '/wyjatki', wybierz(data, POLA))).wyjatek;
 };
 
 // Aktualizuj override
 export const updateOverride = async (id: string, data: Partial<AvailabilityOverride>): Promise<void> => {
-  const overrideDoc = doc(db, 'availability_overrides', id);
-  await updateDoc(overrideDoc, data);
+  const obecny = (await getOverrides()).find(o => o.id === id);
+  if (!obecny) throw new Error('Override not found');
+  await api('PUT', `/wyjatki/${id}`, wybierz({ ...obecny, ...data }, POLA));
 };
 
 // Usuń override (przywróć domyślną dostępność)
 export const deleteOverride = async (id: string): Promise<void> => {
-  const overrideDoc = doc(db, 'availability_overrides', id);
-  await deleteDoc(overrideDoc);
+  await api('DELETE', `/wyjatki/${id}`);
 };
 
 // Usuń wszystkie overrides terapeuty
 export const deleteOverridesByTherapist = async (therapistId: string): Promise<void> => {
-  const q = query(overridesCollectionRef, where('therapistId', '==', therapistId));
-  const data = await getDocs(q);
-  const promises = data.docs.map(doc => deleteDoc(doc.ref));
-  await Promise.all(promises);
+  const lista = await getOverridesByTherapist(therapistId);
+  await Promise.all(lista.map(o => deleteOverride(o.id)));
 };
