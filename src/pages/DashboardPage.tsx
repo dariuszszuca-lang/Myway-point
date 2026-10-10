@@ -137,7 +137,8 @@ export function DashboardPage() {
         const [sessionsData, therapistsData, patientsData, statsData] = await Promise.all([
           getTodaySessions(),
           getTherapists(),
-          getPatients(),
+          // Pacjent nie ma dostępu do bazy pacjentów. Bez tego warunku odmowa serwera zostawiała mu pusty pulpit.
+          capabilities.canViewPatients ? getPatients() : Promise.resolve([]),
           getDashboardStats(),
         ]);
 
