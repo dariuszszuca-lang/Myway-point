@@ -549,8 +549,8 @@ export function CalendarPage() {
   };
 
   const handleStatusChange = async (sessionId: string, newStatus: Session['status']) => {
-    // Pacjent może tylko odwołać swoją zaplanowaną wizytę (serwer sprawdza, czy wizyta jest jego).
-    const odwolanieWlasnej = role === 'patient' && newStatus === 'cancelled' && selectedSession?.status === 'scheduled';
+    // Pacjent i terapeuta mogą tylko odwołać swoją zaplanowaną wizytę (serwer sprawdza, czy wizyta jest ich).
+    const odwolanieWlasnej = (role === 'patient' || role === 'therapist') && newStatus === 'cancelled' && selectedSession?.status === 'scheduled';
     if (!capabilities.canManageSessions && !odwolanieWlasnej) return;
     try {
       const previousStatus = selectedSession?.status;

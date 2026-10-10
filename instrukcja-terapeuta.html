@@ -18,7 +18,7 @@
 
 <div class="skrot">
   <div><b>Logowanie</b>Adres e-mail i hasło. Te same co dotąd.</div>
-  <div><b>Terapeuta</b>Widzi swoje wizyty i bazę pacjentów. Nie zmienia danych.</div>
+  <div><b>Terapeuta</b>Widzi swoje wizyty i bazę pacjentów. Może odwołać swoją wizytę.</div>
   <div><b>Administrator</b>Zapisuje pacjentów, zmienia wizyty, prowadzi grafik.</div>
 </div>
 
@@ -28,7 +28,7 @@
   <tr><th>Czynność</th><th>Pacjent</th><th>Terapeuta</th><th>Administrator</th></tr>
   <tr><td>Podgląd kalendarza</td><td class="tak">tak, swoje wizyty</td><td class="tak">tak, swoje wizyty</td><td class="tak">tak, wszystkie</td></tr>
   <tr><td>Rezerwacja wizyty</td><td class="tak">tak, dla siebie</td><td class="nie">nie</td><td class="tak">tak, dla każdego pacjenta</td></tr>
-  <tr><td>Odwołanie wizyty</td><td class="tak">tak, swojej</td><td class="nie">nie</td><td class="tak">tak</td></tr>
+  <tr><td>Odwołanie zaplanowanej wizyty</td><td class="tak">tak, swojej</td><td class="tak">tak, swojej</td><td class="tak">tak</td></tr>
   <tr><td>Zmiana terminu i statusu wizyty</td><td class="nie">nie</td><td class="nie">nie</td><td class="tak">tak</td></tr>
   <tr><td>Baza pacjentów</td><td class="nie">nie</td><td class="tak">tylko odczyt</td><td class="tak">odczyt i zmiany</td></tr>
   <tr><td>Raporty i Ustawienia (grafik)</td><td class="nie">nie</td><td class="nie">nie</td><td class="tak">tak</td></tr>
@@ -94,7 +94,7 @@
       <tr><td><span class="klawisz">Nieobecność</span></td><td>Oznacza, że pacjent nie przyszedł. Pakiet się nie zmienia.</td></tr>
       <tr><td><span class="klawisz">Usuń</span></td><td>Usuwa wizytę. Termin wraca do puli. Tego nie da się cofnąć.</td></tr>
     </table>
-    <p>Przyciski zmian widzi tylko administrator.</p>
+    <p>Te przyciski widzi tylko administrator. Terapeuta ma w tym oknie jeden przycisk: <span class="klawisz">Odwołaj wizytę</span>. Odwołuje nim swoją zaplanowaną wizytę. Pacjent i zespół dostają wtedy mail o odwołaniu.</p>
     <div class="uwaga"><strong>Oznaczaj wizyty na bieżąco.</strong> Sesja schodzi z pakietu dopiero po statusie „Zakończona”. Bez tego licznik pacjenta i raporty pokazują nieprawdę.</div>
   </div>
   <figure><img src="instrukcja-zrzuty/a3-wizyta.png" alt="Okno szczegółów wizyty"><figcaption>Okno „Szczegóły sesji” u administratora</figcaption></figure>
