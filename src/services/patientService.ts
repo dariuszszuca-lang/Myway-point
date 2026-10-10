@@ -1,57 +1,28 @@
-import { db } from '../firebaseConfig';
-import { collection, getDocs, getDoc, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { api, wybierz } from '../aws/api';
 import { Patient } from '../types';
 
-const patientsCollectionRef = collection(db, 'patients');
+// Baza pacjentów idzie przez API rezerwacji na AWS (administrator: pełny dostęp, terapeuta: odczyt).
+
+const POLA_PACJENTA = ['name', 'phone', 'email', 'totalSessions', 'usedSessions', 'sessionsHistory', 'notes', 'createdAt', 'crmPatientId'];
 
 export const getPatients = async (): Promise<Patient[]> => {
-    const q = query(patientsCollectionRef, orderBy('name', 'asc'));
-    const data = await getDocs(q);
-    // Guard: starsze dokumenty moga nie miec pol pakietu -> undefined w arytmetyce = NaN.
-    // Normalizujemy do liczby przy kazdym odczycie, zeby NaN nie trafil do UI.
-    return data.docs.map(doc => {
-        const d = doc.data();
-        return {
-            ...d,
-            id: doc.id,
-            totalSessions: Number.isFinite(d.totalSessions) ? d.totalSessions : 0,
-            usedSessions: Number.isFinite(d.usedSessions) ? d.usedSessions : 0,
-        } as Patient;
-    });
+    return (await api<{ pacjenci: Patient[] }>('GET', '/pacjenci')).pacjenci;
 };
 
 export const addPatient = async (patientData: Omit<Patient, 'id'>) => {
-    return await addDoc(patientsCollectionRef, patientData);
+    return (await api<{ pacjent: Patient }>('POST', '/pacjenci', wybierz(patientData, POLA_PACJENTA))).pacjent;
 };
 
 export const updatePatient = async (id: string, patientData: Partial<Patient>) => {
-    const patientDoc = doc(db, 'patients', id);
-    return await updateDoc(patientDoc, patientData);
+    return (await api<{ pacjent: Patient }>('PUT', `/pacjenci/${id}`, wybierz(patientData, POLA_PACJENTA))).pacjent;
 };
 
 export const deletePatient = async (id: string) => {
-    const patientDoc = doc(db, 'patients', id);
-    return await deleteDoc(patientDoc);
+    await api('DELETE', `/pacjenci/${id}`);
 };
 
-// Increment usedSessions when session is completed
-export const incrementUsedSessions = async (patientId: string): Promise<void> => {
-    const patientRef = doc(db, 'patients', patientId);
-    const patientSnap = await getDoc(patientRef);
-    if (patientSnap.exists()) {
-        const currentUsed = patientSnap.data().usedSessions || 0;
-        await updateDoc(patientRef, { usedSessions: currentUsed + 1 });
-    }
-};
+// Licznik wykorzystanych sesji zmienia teraz serwer, w tej samej operacji co status wizyty
+// (PUT /sesje/{id}/status). Te dwie funkcje zostają puste, żeby ekran nie policzył sesji drugi raz.
+export const incrementUsedSessions = async (_patientId: string): Promise<void> => {};
 
-// Decrement usedSessions when session is uncompleted (e.g. status changed back)
-export const decrementUsedSessions = async (patientId: string): Promise<void> => {
-    const patientRef = doc(db, 'patients', patientId);
-    const patientSnap = await getDoc(patientRef);
-    if (patientSnap.exists()) {
-        const currentUsed = patientSnap.data().usedSessions || 0;
-        if (currentUsed > 0) {
-            await updateDoc(patientRef, { usedSessions: currentUsed - 1 });
-        }
-    }
-};
+export const decrementUsedSessions = async (_patientId: string): Promise<void> => {};

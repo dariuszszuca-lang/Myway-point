@@ -1,86 +1,40 @@
-import { db } from '../firebaseConfig';
-import {
-  collection,
-  getDocs,
-  getDoc,
-  doc,
-  writeBatch,
-  query,
-  where,
-  orderBy
-} from 'firebase/firestore';
+import { api, wybierz } from '../aws/api';
 import { BookedSlot, Session, CreateSessionData, SessionStatus } from '../types';
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
-const sessionsCollectionRef = collection(db, 'sessions');
-const bookedSlotsCollectionRef = collection(db, 'booked_slots');
+// Dane wizyt i zajętych terminów idą przez API rezerwacji na AWS.
+// Zasady rezerwacji (3 dni, limit sesji, 1 wizyta w tygodniu, zajęty termin) sprawdza także serwer.
 
-const buildBookedSlot = (
-  sessionId: string,
-  session: Pick<Session, 'therapistId' | 'date' | 'startTime' | 'endTime' | 'status' | 'updatedAt'>
-): Omit<BookedSlot, 'id'> => ({
-  sessionId,
-  therapistId: session.therapistId,
-  date: session.date,
-  startTime: session.startTime,
-  endTime: session.endTime,
-  status: session.status,
-  updatedAt: session.updatedAt,
-});
+const POLA_WIZYTY = ['patientId', 'patientName', 'patientEmail', 'patientPhone', 'therapistId', 'therapistName', 'date', 'startTime', 'endTime', 'notes'];
 
-const mapSessionDoc = (sessionDoc: { id: string; data: () => unknown }): Session => ({
-  ...(sessionDoc.data() as Omit<Session, 'id'>),
-  id: sessionDoc.id,
-});
-
-const mapBookedSlotDoc = (slotDoc: { id: string; data: () => unknown }): BookedSlot => ({
-  ...(slotDoc.data() as Omit<BookedSlot, 'id'>),
-  id: slotDoc.id,
-});
+const zakres = (od?: string, doDnia?: string) => {
+  const q = new URLSearchParams();
+  if (od) q.set('od', od);
+  if (doDnia) q.set('do', doDnia);
+  const tekst = q.toString();
+  return tekst ? `?${tekst}` : '';
+};
 
 // Get all sessions
 export const getSessions = async (): Promise<Session[]> => {
-  const q = query(sessionsCollectionRef, orderBy('date', 'asc'), orderBy('startTime', 'asc'));
-  const data = await getDocs(q);
-  return data.docs.map(mapSessionDoc);
+  return (await api<{ sesje: Session[] }>('GET', '/sesje')).sesje;
 };
 
 // Get sessions for a specific date
 export const getSessionsByDate = async (date: string): Promise<Session[]> => {
-  const q = query(
-    sessionsCollectionRef,
-    where('date', '==', date),
-    orderBy('startTime', 'asc')
-  );
-  const data = await getDocs(q);
-  return data.docs.map(mapSessionDoc);
+  return (await api<{ sesje: Session[] }>('GET', `/sesje${zakres(date, date)}`)).sesje;
 };
 
 // Get sessions for a date range
 export const getSessionsByDateRange = async (startDate: string, endDate: string): Promise<Session[]> => {
-  const q = query(
-    sessionsCollectionRef,
-    where('date', '>=', startDate),
-    where('date', '<=', endDate),
-    orderBy('date', 'asc'),
-    orderBy('startTime', 'asc')
-  );
-  const data = await getDocs(q);
-  return data.docs.map(mapSessionDoc);
+  return (await api<{ sesje: Session[] }>('GET', `/sesje${zakres(startDate, endDate)}`)).sesje;
 };
 
 // Get sessions for a specific therapist
+// (terapeuta dostaje z serwera wyłącznie swoje wizyty; administrator może wskazać terapeutę)
 export const getSessionsByTherapist = async (therapistId: string): Promise<Session[]> => {
-  const q = query(
-    sessionsCollectionRef,
-    where('therapistId', '==', therapistId)
-  );
-  const data = await getDocs(q);
-  return data.docs
-    .map(mapSessionDoc)
-    .sort((left, right) =>
-      `${left.date} ${left.startTime}`.localeCompare(`${right.date} ${right.startTime}`)
-    );
+  const sesje = (await api<{ sesje: Session[] }>('GET', `/sesje?terapeuta=${encodeURIComponent(therapistId)}`)).sesje;
+  return sesje.filter(session => session.therapistId === therapistId);
 };
 
 export const getPatientSessionsByDateRange = async (
@@ -88,18 +42,12 @@ export const getPatientSessionsByDateRange = async (
   startDate: string,
   endDate: string
 ): Promise<Session[]> => {
-  const q = query(sessionsCollectionRef, where('patientId', '==', patientId));
-  const data = await getDocs(q);
-  return data.docs
-    .map(mapSessionDoc)
-    .filter(session => session.date >= startDate && session.date <= endDate)
-    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+  const sesje = await getSessionsByDateRange(startDate, endDate);
+  return sesje.filter(session => session.patientId === patientId);
 };
 
 export const getBookedSlotsByDate = async (date: string): Promise<BookedSlot[]> => {
-  const q = query(bookedSlotsCollectionRef, where('date', '==', date));
-  const data = await getDocs(q);
-  return data.docs.map(mapBookedSlotDoc);
+  return (await api<{ terminy: BookedSlot[] }>('GET', `/terminy?data=${date}`)).terminy;
 };
 
 // Get today's sessions
@@ -126,102 +74,27 @@ export const getMonthSessions = async (): Promise<Session[]> => {
 
 // Create a new session
 export const createSession = async (sessionData: CreateSessionData): Promise<Session> => {
-  const now = Date.now();
-  const newSession = {
-    ...sessionData,
-    status: 'scheduled' as SessionStatus,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  const sessionRef = doc(sessionsCollectionRef);
-  const slotRef = doc(db, 'booked_slots', sessionRef.id);
-  const batch = writeBatch(db);
-
-  batch.set(sessionRef, newSession);
-  batch.set(slotRef, buildBookedSlot(sessionRef.id, newSession));
-  await batch.commit();
-
-  return { ...newSession, id: sessionRef.id };
+  return (await api<{ sesja: Session }>('POST', '/sesje', wybierz(sessionData, POLA_WIZYTY))).sesja;
 };
 
 // Update session
 export const updateSession = async (id: string, updates: Partial<Session>): Promise<void> => {
-  const sessionDoc = doc(db, 'sessions', id);
-  const sessionSnap = await getDoc(sessionDoc);
-  if (!sessionSnap.exists()) {
-    throw new Error('Session not found');
-  }
-
-  const existingSession = { ...sessionSnap.data(), id } as Session;
-  const now = Date.now();
-  const updatedSession = {
-    ...existingSession,
-    ...updates,
-    updatedAt: now,
-  };
-
-  const slotDoc = doc(db, 'booked_slots', id);
-  const batch = writeBatch(db);
-
-  batch.update(sessionDoc, {
-    ...updates,
-    updatedAt: now,
-  });
-  batch.set(slotDoc, buildBookedSlot(id, updatedSession), { merge: true });
-  await batch.commit();
+  await api('PUT', `/sesje/${id}`, wybierz(updates, POLA_WIZYTY));
 };
 
 // Update session status
 export const updateSessionStatus = async (id: string, status: SessionStatus): Promise<void> => {
-  const sessionDoc = doc(db, 'sessions', id);
-  const sessionSnap = await getDoc(sessionDoc);
-  if (!sessionSnap.exists()) {
-    throw new Error('Session not found');
-  }
-
-  const existingSession = { ...sessionSnap.data(), id } as Session;
-  const updatedSession = {
-    ...existingSession,
-    status,
-    updatedAt: Date.now(),
-  };
-
-  const slotDoc = doc(db, 'booked_slots', id);
-  const batch = writeBatch(db);
-
-  batch.update(sessionDoc, {
-    status: updatedSession.status,
-    updatedAt: updatedSession.updatedAt,
-  });
-  batch.set(slotDoc, buildBookedSlot(id, updatedSession), { merge: true });
-  await batch.commit();
+  await api('PUT', `/sesje/${id}/status`, { status });
 };
 
 // Delete session
 export const deleteSession = async (id: string): Promise<void> => {
-  const sessionDoc = doc(db, 'sessions', id);
-  const slotDoc = doc(db, 'booked_slots', id);
-  const batch = writeBatch(db);
-
-  batch.delete(sessionDoc);
-  batch.delete(slotDoc);
-  await batch.commit();
+  await api('DELETE', `/sesje/${id}`);
 };
 
 // Cancel session
 export const cancelSession = async (id: string): Promise<void> => {
   await updateSessionStatus(id, 'cancelled');
-};
-
-// Mark session as completed
-export const completeSession = async (id: string): Promise<void> => {
-  await updateSessionStatus(id, 'completed');
-};
-
-// Mark session as no-show
-export const markNoShow = async (id: string): Promise<void> => {
-  await updateSessionStatus(id, 'no-show');
 };
 
 // Check if time slot is available

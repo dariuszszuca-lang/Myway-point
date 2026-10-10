@@ -1,8 +1,8 @@
-import { db } from '../firebaseConfig';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
+import { api, wybierz } from '../aws/api';
 import { Availability, AvailabilityOverride } from '../types';
 
-const availabilityCollectionRef = collection(db, 'availability');
+// Stałe godziny tygodnia idą przez API rezerwacji na AWS (zapis tylko administrator).
+const POLA_DOSTEPNOSCI = ['therapistId', 'dayOfWeek', 'startTime', 'endTime', 'isActive'];
 
 // Day names in Polish
 export const DAY_NAMES = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
@@ -24,37 +24,29 @@ export const DEFAULT_AVAILABILITY: Omit<Availability, 'id'>[] = [
 ];
 
 export const getAvailability = async (): Promise<Availability[]> => {
-  const data = await getDocs(availabilityCollectionRef);
-  return data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Availability[];
+  return (await api<{ dostepnosc: Availability[] }>('GET', '/dostepnosc')).dostepnosc;
 };
 
 export const getAvailabilityByTherapist = async (therapistId: string): Promise<Availability[]> => {
-  const q = query(availabilityCollectionRef, where('therapistId', '==', therapistId));
-  const data = await getDocs(q);
-  return data.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Availability[];
+  return (await getAvailability()).filter(a => a.therapistId === therapistId);
 };
 
 export const addAvailability = async (data: Omit<Availability, 'id'>): Promise<Availability> => {
-  const docRef = await addDoc(availabilityCollectionRef, data);
-  return { ...data, id: docRef.id };
+  return (await api<{ dostepnosc: Availability }>('POST', '/dostepnosc', wybierz(data, POLA_DOSTEPNOSCI))).dostepnosc;
 };
 
 export const updateAvailability = async (id: string, data: Partial<Availability>): Promise<void> => {
-  const availabilityDoc = doc(db, 'availability', id);
-  await updateDoc(availabilityDoc, data);
+  await api('PUT', `/dostepnosc/${id}`, wybierz(data, POLA_DOSTEPNOSCI));
 };
 
 export const deleteAvailability = async (id: string): Promise<void> => {
-  const availabilityDoc = doc(db, 'availability', id);
-  await deleteDoc(availabilityDoc);
+  await api('DELETE', `/dostepnosc/${id}`);
 };
 
+// Przy usuwaniu terapeuty serwer sam usuwa jego godziny. Funkcja zostaje dla zgodności.
 export const deleteAvailabilityByTherapist = async (therapistId: string): Promise<void> => {
-  const q = query(availabilityCollectionRef, where('therapistId', '==', therapistId));
-  const data = await getDocs(q);
-  const batch = writeBatch(db);
-  data.docs.forEach(doc => batch.delete(doc.ref));
-  await batch.commit();
+  const lista = await getAvailabilityByTherapist(therapistId);
+  await Promise.all(lista.map(a => deleteAvailability(a.id)));
 };
 
 // Initialize default availability for a therapist

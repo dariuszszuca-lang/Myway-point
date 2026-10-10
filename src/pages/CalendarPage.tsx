@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
+import { ApiError } from '../aws/api';
 import { pl } from 'date-fns/locale';
 import {
   ChevronLeft,
@@ -443,7 +444,7 @@ export function CalendarPage() {
       loadData();
     } catch (error) {
       console.error('Error updating session:', error);
-      alert('Błąd podczas aktualizacji sesji');
+      alert(error instanceof ApiError && [400, 409].includes(error.status) ? error.message : 'Błąd podczas aktualizacji sesji');
     }
   };
 
@@ -533,7 +534,11 @@ export function CalendarPage() {
       loadData();
     } catch (error: any) {
       console.error('Error creating session:', error);
-      if (error?.code === 'permission-denied') {
+      if (error instanceof ApiError && [400, 409].includes(error.status)) {
+        // Serwer sprawdza te same zasady co ekran (termin, limit, 3 dni) i podaje powód odmowy.
+        alert(error.message);
+        loadData();
+      } else if (error?.status === 403) {
         alert('Brak uprawnień do rezerwacji. Skontaktuj się z ośrodkiem MyWay pod numerem 731 395 295.');
       } else if (error?.code === 'unavailable') {
         alert('Serwer jest chwilowo niedostępny. Spróbuj ponownie za chwilę.');
