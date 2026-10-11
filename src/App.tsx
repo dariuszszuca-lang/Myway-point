@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/LoginPage';
@@ -20,6 +21,21 @@ import {
 } from 'lucide-react';
 import { signOut } from './aws/cognito';
 import { getRoleCapabilities } from './auth/accessPolicy';
+
+// Biblioteka wideo jest duża: ładuje się dopiero przy wejściu do rozmowy.
+const VideoPage = lazy(() => import('./pages/VideoPage'));
+
+// Rozmowa wideo: po zalogowaniu, ale bez menu aplikacji.
+function VideoRoute() {
+  const { user, isAdmin } = useAuth();
+  if (!user) return <Navigate to="/login" />;
+  if (isAdmin) return <Navigate to="/calendar" replace />;
+  return (
+    <Suspense fallback={<div className="gabinet min-h-screen" />}>
+      <VideoPage />
+    </Suspense>
+  );
+}
 
 // --- Protected Route ---
 function ProtectedRoute() {
@@ -53,6 +69,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/wideo/:idWizyty" element={<VideoRoute />} />
           <Route path="/" element={<ProtectedRoute />}>
             <Route index element={<DashboardPage />} />
             <Route path="calendar" element={<CalendarPage />} />

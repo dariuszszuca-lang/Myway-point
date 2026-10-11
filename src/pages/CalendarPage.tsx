@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, addDays, startOfWeek, isSameDay, parseISO } from 'date-fns';
-import { ApiError } from '../aws/api';
+import { api, ApiError } from '../aws/api';
+import { oknoWideo, godzinaOtwarcia } from '../wideo/okno';
 import { pl } from 'date-fns/locale';
 import {
   ChevronLeft,
@@ -13,7 +15,8 @@ import {
   Check,
   AlertCircle,
   Mail,
-  Phone
+  Phone,
+  Video
 } from 'lucide-react';
 import { getSessionsByDateRange, getPatientSessionsByDateRange, getSessionsByTherapist, createSession, updateSession, updateSessionStatus, deleteSession, getPatientSessionsInWeek, isTimeSlotAvailable } from '../services/sessionService';
 import { getTherapists, getTherapistColor, ensureTherapistsExist, initializeAvailabilityForExistingTherapists } from '../services/therapistService';
@@ -68,6 +71,15 @@ export function CalendarPage() {
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  // Rozmowy wideo: serwer mówi, czy są włączone dla tego ośrodka i tej roli.
+  const [wideoWlaczone, setWideoWlaczone] = useState(false);
+  useEffect(() => {
+    if (role !== 'patient' && role !== 'therapist') return;
+    api<{ wlaczone: boolean }>('GET', '/wideo/stan')
+      .then((stan) => setWideoWlaczone(Boolean(stan.wlaczone)))
+      .catch(() => setWideoWlaczone(false));
+  }, [role]);
   const [selectedTherapist, setSelectedTherapist] = useState<string | 'all'>('all');
 
   // Override modal state
@@ -1152,6 +1164,28 @@ export function CalendarPage() {
                       );
                     })()}
                   </div>
+
+                  {/* Rozmowa wideo: pacjent i terapeuta tej wizyty, w oknie wejścia */}
+                  {wideoWlaczone && selectedSession.status === 'scheduled' && (() => {
+                    const okno = oknoWideo(selectedSession);
+                    if (okno === 'po-czasie') return null;
+                    return okno === 'otwarte' ? (
+                      <button
+                        onClick={() => navigate(`/wideo/${selectedSession.id}`, { state: { session: selectedSession } })}
+                        className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-myway-primary text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-500/20"
+                      >
+                        <Video size={18} />
+                        Dołącz do wideo
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-xl border border-teal-100">
+                        <Video size={18} className="text-teal-600 shrink-0" />
+                        <span className="text-sm text-teal-800">
+                          Rozmowa wideo: wejście w dniu wizyty od {godzinaOtwarcia(selectedSession)}.
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Admin actions: Edit + Status */}
                   {isAdmin && (

@@ -94,3 +94,46 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Ekran rozmowy wideo: spokojny gabinet (ciemna morska zieleń, miękkie ramy) */
+.gabinet {
+  background:
+    radial-gradient(120% 80% at 50% 0%, #17494a 0%, rgba(23, 73, 74, 0) 60%),
+    #082524;
+}
+
+.gabinet-rama {
+  border-radius: 28px;
+  background: #0d3331;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 30px 60px -30px rgba(0, 0, 0, 0.6);
+}
+
+.gabinet-krag {
+  width: 96px;
+  height: 96px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #17494a;
+  box-shadow: 0 0 0 1px rgba(127, 214, 198, 0.35);
+}
+
+/* Czekanie na drugą osobę: krąg oddycha w tempie spokojnego oddechu */
+@keyframes gabinet-oddech {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(127, 214, 198, 0.35), 0 0 0 0 rgba(127, 214, 198, 0.22); }
+  50% { box-shadow: 0 0 0 1px rgba(127, 214, 198, 0.35), 0 0 0 26px rgba(127, 214, 198, 0); }
+}
+
+.gabinet-oddech {
+  animation: gabinet-oddech 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gabinet-oddech { animation: none; }
+}
+
+.gabinet-fokus:focus-visible {
+  outline: 2px solid #7fd6c6;
+  outline-offset: 3px;
+}
