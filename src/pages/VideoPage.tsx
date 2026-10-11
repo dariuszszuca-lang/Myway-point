@@ -20,6 +20,14 @@ import type { Session } from '../types';
 type Etap = 'poczekalnia' | 'laczenie' | 'rozmowa' | 'zerwane' | 'koniec';
 type KlopotZeSprzetem = 'brak-zgody' | 'brak-urzadzen' | 'zajete' | 'inny' | null;
 
+interface Informacja {
+  wizyta: { id: string; date: string; startTime: string; endTime: string; status: string };
+  rozmowca: string | null;
+  okno: 'otwarte' | 'za-wczesnie' | 'po-czasie';
+  otwarcie: number;
+  rola: string;
+}
+
 interface Dolaczenie {
   pokoj: Record<string, unknown>;
   uczestnik: { AttendeeId: string } & Record<string, unknown>;
@@ -62,7 +70,29 @@ export function VideoPage() {
   const navigate = useNavigate();
   const { isTherapist } = useAuth();
   const wizyta = (useLocation().state as { session?: Session } | null)?.session;
-  const rozmowca = wizyta ? (isTherapist ? wizyta.patientName : wizyta.therapistName) : null;
+  // Po wejściu z linku w mailu nie ma danych z kalendarza: pytamy serwer, co to za wizyta.
+  const [info, setInfo] = useState<Informacja | null>(null);
+  const [odmowa, setOdmowa] = useState<string | null>(null);
+  const [teraz, setTeraz] = useState(() => Date.now());
+  useEffect(() => {
+    let aktualne = true;
+    api<Informacja>('GET', `/wideo/${idWizyty}`)
+      .then((dane) => { if (aktualne) setInfo(dane); })
+      .catch((e) => { if (aktualne) setOdmowa(e instanceof ApiError ? e.message : 'Nie udało się otworzyć rozmowy.'); });
+    return () => { aktualne = false; };
+  }, [idWizyty]);
+  useEffect(() => {
+    const zegar = window.setInterval(() => setTeraz(Date.now()), 15_000);
+    return () => window.clearInterval(zegar);
+  }, []);
+  const rozmowca = info?.rozmowca ?? (wizyta ? (isTherapist ? wizyta.patientName : wizyta.therapistName) : null);
+  const zaWczesnie = Boolean(info && info.okno === 'za-wczesnie' && teraz < info.otwarcie);
+  const niedostepna = odmowa
+    ?? (info && info.wizyta.status !== 'scheduled' ? 'Ta wizyta nie jest już zaplanowana, więc rozmowa wideo jest zamknięta.' : null)
+    ?? (info && info.okno === 'po-czasie' ? 'Czas tej wizyty już minął.' : null);
+  const kiedyOtwarcie = info
+    ? new Intl.DateTimeFormat('pl-PL', { timeZone: 'Europe/Warsaw', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(new Date(info.otwarcie))
+    : '';
   const ktoDrugi = isTherapist ? 'pacjent' : 'terapeuta';
 
   const [etap, setEtap] = useState<Etap>('poczekalnia');
@@ -112,13 +142,13 @@ export function VideoPage() {
   }, []);
 
   useEffect(() => {
-    if (etap !== 'poczekalnia') return;
+    if (etap !== 'poczekalnia' || niedostepna) return;
     wlaczSprzet();
     return () => {
       zatrzymaj(strumienRef.current);
       strumienRef.current = null;
     };
-  }, [etap, wlaczSprzet]);
+  }, [etap, wlaczSprzet, niedostepna]);
 
   // Wskaźnik głośności: pacjent widzi, że mikrofon go słyszy.
   useEffect(() => {
@@ -286,7 +316,8 @@ export function VideoPage() {
   }, [rozlacz]);
 
   const doKalendarza = () => navigate('/calendar');
-  const godziny = wizyta ? `${wizyta.startTime} – ${wizyta.endTime}`.replace('–', 'do') : null;
+  const czasWizyty = info?.wizyta ?? wizyta;
+  const godziny = czasWizyty ? `${czasWizyty.startTime} do ${czasWizyty.endTime}` : null;
   const wRozmowie = etap === 'rozmowa';
 
   return (
@@ -310,7 +341,19 @@ export function VideoPage() {
       </header>
 
       {/* Poczekalnia */}
-      {(etap === 'poczekalnia' || etap === 'laczenie') && (
+      {niedostepna && (etap === 'poczekalnia' || etap === 'laczenie') && (
+        <main className="flex-1 flex items-center justify-center px-4 py-6">
+          <div className="w-full max-w-sm text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">Rozmowa jest niedostępna</h1>
+            <p className="mt-2 text-sm text-[#a9c9c2]">{niedostepna}</p>
+            <button onClick={doKalendarza} className="gabinet-fokus mt-6 w-full py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 font-medium transition-colors">
+              Przejdź do kalendarza
+            </button>
+          </div>
+        </main>
+      )}
+
+      {!niedostepna && (etap === 'poczekalnia' || etap === 'laczenie') && (
         <main className="flex-1 flex items-center justify-center px-4 py-6">
           <div className="w-full max-w-md">
             <h1 className="text-2xl font-semibold tracking-tight">Sprawdź, czy Cię widać i słychać</h1>
@@ -373,11 +416,16 @@ export function VideoPage() {
 
             <button
               onClick={dolacz}
-              disabled={etap === 'laczenie' || !sprzetGotowy}
+              disabled={etap === 'laczenie' || !sprzetGotowy || zaWczesnie}
               className="gabinet-fokus mt-6 w-full py-3.5 rounded-2xl bg-[#7fd6c6] text-[#062321] font-semibold hover:bg-[#9be3d5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {etap === 'laczenie' ? 'Łączę…' : 'Wejdź do rozmowy'}
             </button>
+            {zaWczesnie && (
+              <p role="status" className="mt-3 text-sm text-center text-[#a9c9c2]">
+                Pokój otworzy się: {kiedyOtwarcie}. Możesz zostać na tej stronie, przycisk włączy się sam.
+              </p>
+            )}
           </div>
         </main>
       )}

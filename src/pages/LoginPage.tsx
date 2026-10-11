@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { signIn, signUp, confirmSignUp, resendCode, forgotPassword, confirmForgotPassword, AuthError } from '../aws/cognito';
 import { Activity, Mail, Lock, ArrowRight, Shield, Clock, Users, UserPlus, CheckCircle, User, KeyRound } from 'lucide-react';
 
@@ -21,10 +21,13 @@ export function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [tryb, setTryb] = useState<Tryb>('zwykly');
   const [kod, setKod] = useState('');
+  // Wejście z linku (np. rozmowa wideo z maila): po zalogowaniu wracamy pod ten sam adres.
+  const skad = (useLocation().state as { from?: string } | null)?.from;
+  const powrot = skad && skad.startsWith('/wideo/') ? skad : '/';
 
   // Jeśli użytkownik jest zalogowany, przekieruj do dashboardu
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={powrot} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

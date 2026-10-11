@@ -27,9 +27,9 @@ const VideoPage = lazy(() => import('./pages/VideoPage'));
 
 // Rozmowa wideo: po zalogowaniu, ale bez menu aplikacji.
 function VideoRoute() {
-  const { user, isAdmin } = useAuth();
-  if (!user) return <Navigate to="/login" />;
-  if (isAdmin) return <Navigate to="/calendar" replace />;
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return (
     <Suspense fallback={<div className="gabinet min-h-screen" />}>
       <VideoPage />
