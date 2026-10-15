@@ -27,6 +27,7 @@ import { Session, Therapist, Patient, WORKING_HOURS } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { getSessionContact, selectTherapistSessions } from '../auth/sessionAccess';
 import { canLoadTherapistSchedule, getRoleCapabilities } from '../auth/accessPolicy';
+import { PrzyciskWideo } from '../wideo/PrzyciskWideo';
 
 // Helper to add minutes to time string
 const addMinutesToTime = (time: string, minutes: number): string => {
@@ -694,6 +695,9 @@ export function DashboardPage() {
                       );
                     })()}
                   </div>
+
+                  {/* Rozmowa wideo: pacjent i terapeuta tej wizyty */}
+                  <PrzyciskWideo sesja={selectedSession} />
 
                   {/* Session package info */}
                   {isAdmin && (() => {
