@@ -108,6 +108,14 @@ body {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 30px 60px -30px rgba(0, 0, 0, 0.6);
 }
 
+/* Na telefonie rozmowa na cały ekran, bez ramy */
+@media (max-width: 639px) {
+  .gabinet-rozmowa {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
 .gabinet-krag {
   width: 96px;
   height: 96px;

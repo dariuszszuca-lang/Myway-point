@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  BackgroundBlurVideoFrameProcessor,
+  BackgroundReplacementVideoFrameProcessor,
   ConsoleLogger,
   DefaultDeviceController,
   DefaultMeetingSession,
   LogLevel,
   MeetingSessionConfiguration,
   MeetingSessionStatusCode,
+  DefaultVideoTransformDevice,
 } from 'amazon-chime-sdk-js';
 import type { AudioVideoFacade, AudioVideoObserver, MeetingSessionStatus, VideoTileState } from 'amazon-chime-sdk-js';
-import { ArrowLeft, Mic, MicOff, PhoneOff, Video, VideoOff, WifiOff } from 'lucide-react';
+import { ArrowLeft, Image as IkonaTla, Mic, MicOff, PhoneOff, Video, VideoOff, WifiOff, X } from 'lucide-react';
 import { api, ApiError } from '../aws/api';
 import { useAuth } from '../context/AuthContext';
 import type { Session } from '../types';
@@ -61,6 +64,26 @@ function rozpoznajKlopot(e: unknown): Exclude<KlopotZeSprzetem, null> {
   return 'inny';
 }
 
+// Tło za osobą w rozmowie. Obrazy krajobrazów: grafika AI w public/tla.
+type Tlo = 'brak' | 'rozmycie' | 'jezioro' | 'morze' | 'gory' | 'las';
+const TLA: { id: Tlo; nazwa: string; mini?: string }[] = [
+  { id: 'brak', nazwa: 'Bez tła' },
+  { id: 'rozmycie', nazwa: 'Rozmycie' },
+  { id: 'jezioro', nazwa: 'Jezioro', mini: '/tla/jezioro-mini.jpg' },
+  { id: 'morze', nazwa: 'Morze', mini: '/tla/morze-mini.jpg' },
+  { id: 'gory', nazwa: 'Góry', mini: '/tla/gory-mini.jpg' },
+  { id: 'las', nazwa: 'Las', mini: '/tla/las-mini.jpg' },
+];
+
+function zapamietaneTlo(): Tlo {
+  try {
+    const t = localStorage.getItem('wideo-tlo');
+    return TLA.some((x) => x.id === t) ? (t as Tlo) : 'brak';
+  } catch {
+    return 'brak';
+  }
+}
+
 function zatrzymaj(strumien: MediaStream | null) {
   strumien?.getTracks().forEach((t) => t.stop());
 }
@@ -107,6 +130,12 @@ export function VideoPage() {
   const [obrazDrugiej, setObrazDrugiej] = useState(false);
   const [slabeLacze, setSlabeLacze] = useState(false);
   const [wznawianie, setWznawianie] = useState(false);
+  const [tlo, setTlo] = useState<Tlo>(zapamietaneTlo);
+  const [tlaMozliwe, setTlaMozliwe] = useState(false);
+  const [wyborTla, setWyborTla] = useState(false);
+  const [tloLaduje, setTloLaduje] = useState(false);
+  // Obraz rozmówcy w innym układzie niż ekran (poziomy na pionowym telefonie): pokazujemy cały, bez przycinania.
+  const [calyObraz, setCalyObraz] = useState(false);
 
   const podgladRef = useRef<HTMLVideoElement>(null);
   const wlasnyRef = useRef<HTMLVideoElement>(null);
@@ -115,6 +144,59 @@ export function VideoPage() {
   const strumienRef = useRef<MediaStream | null>(null);
   const avRef = useRef<AudioVideoFacade | null>(null);
   const wychodzeRef = useRef(false);
+  const dziennikRef = useRef(new ConsoleLogger('wideo', LogLevel.WARN));
+  const urzadzenieRef = useRef<DefaultVideoTransformDevice | null>(null);
+  const tloRef = useRef(tlo);
+  tloRef.current = tlo;
+
+  useEffect(() => {
+    BackgroundBlurVideoFrameProcessor.isSupported().then(setTlaMozliwe).catch(() => setTlaMozliwe(false));
+  }, []);
+
+  const sprawdzDopasowanie = useCallback(() => {
+    const v = zdalnyRef.current;
+    const k = v?.parentElement;
+    if (!v || !k || !v.videoWidth || !k.clientHeight) return;
+    setCalyObraz((v.videoWidth >= v.videoHeight) !== (k.clientWidth >= k.clientHeight));
+  }, []);
+  useEffect(() => {
+    window.addEventListener('resize', sprawdzDopasowanie);
+    return () => window.removeEventListener('resize', sprawdzDopasowanie);
+  }, [sprawdzDopasowanie]);
+
+  // Kamera z wybranym tłem. Gdy tło nie zadziała na tym urządzeniu, idzie zwykły obraz.
+  const uruchomKamere = useCallback(async (av: AudioVideoFacade, wybor: Tlo): Promise<boolean> => {
+    const kamery = await av.listVideoInputDevices();
+    if (!kamery.length) return false;
+    const id = kamery[0].deviceId || 'default';
+    const dziennik = dziennikRef.current;
+    const stare = urzadzenieRef.current;
+    urzadzenieRef.current = null;
+    let wejscie: string | DefaultVideoTransformDevice = id;
+    if (wybor !== 'brak') {
+      try {
+        const procesor = wybor === 'rozmycie'
+          ? await BackgroundBlurVideoFrameProcessor.create(undefined, { logger: dziennik })
+          : await BackgroundReplacementVideoFrameProcessor.create(undefined, {
+            logger: dziennik,
+            imageBlob: await (await fetch(`/tla/${wybor}.jpg`)).blob(),
+          });
+        if (procesor) {
+          urzadzenieRef.current = new DefaultVideoTransformDevice(dziennik, id, [procesor]);
+          wejscie = urzadzenieRef.current;
+        }
+      } catch { /* zostaje zwykła kamera */ }
+    }
+    await av.startVideoInput(wejscie);
+    await stare?.stop();
+    return true;
+  }, []);
+
+  const zatrzymajKamere = useCallback(async (av: AudioVideoFacade) => {
+    await av.stopVideoInput();
+    await urzadzenieRef.current?.stop();
+    urzadzenieRef.current = null;
+  }, []);
 
   // --- Poczekalnia: podgląd kamery i wskaźnik mikrofonu, jeszcze bez połączenia z pokojem ---
   const wlaczSprzet = useCallback(async () => {
@@ -185,11 +267,11 @@ export function VideoPage() {
     if (!av) return;
     try {
       av.stopLocalVideoTile();
-      await av.stopVideoInput();
+      await zatrzymajKamere(av);
       await av.stopAudioInput();
     } catch { /* sprzęt mógł już zniknąć */ }
     av.stop();
-  }, []);
+  }, [zatrzymajKamere]);
 
   const dolacz = useCallback(async () => {
     setBlad(null);
@@ -199,7 +281,7 @@ export function VideoPage() {
     strumienRef.current = null;
     try {
       const dane = await api<Dolaczenie>('POST', `/wideo/${idWizyty}/dolacz`);
-      const dziennik = new ConsoleLogger('wideo', LogLevel.WARN);
+      const dziennik = dziennikRef.current;
       const sesja = new DefaultMeetingSession(
         new MeetingSessionConfiguration(dane.pokoj, dane.uczestnik),
         dziennik,
@@ -251,9 +333,7 @@ export function VideoPage() {
       av.start();
       if (!mikrofon) av.realtimeMuteLocalAudio();
       if (kamera) {
-        const kamery = await av.listVideoInputDevices();
-        if (kamery.length) {
-          await av.startVideoInput(kamery[0].deviceId || 'default');
+        if (await uruchomKamere(av, tloRef.current)) {
           av.startLocalVideoTile();
         } else {
           setMaKamere(false);
@@ -271,7 +351,7 @@ export function VideoPage() {
       }
       setEtap('poczekalnia');
     }
-  }, [idWizyty, mikrofon, kamera, rozlacz]);
+  }, [idWizyty, mikrofon, kamera, rozlacz, uruchomKamere]);
 
   const przelaczMikrofon = () => {
     const av = avRef.current;
@@ -287,18 +367,32 @@ export function VideoPage() {
     try {
       if (kamera) {
         av.stopLocalVideoTile();
-        await av.stopVideoInput();
+        await zatrzymajKamere(av);
         setKamera(false);
+        setWyborTla(false);
       } else {
-        const kamery = await av.listVideoInputDevices();
-        if (!kamery.length) { setMaKamere(false); return; }
-        await av.startVideoInput(kamery[0].deviceId || 'default');
+        if (!(await uruchomKamere(av, tlo))) { setMaKamere(false); return; }
         av.startLocalVideoTile();
         setKamera(true);
         setSlabeLacze(false);
       }
     } catch (e) {
       setKlopot(rozpoznajKlopot(e));
+    }
+  };
+
+  const wybierzTlo = async (nowe: Tlo) => {
+    setTlo(nowe);
+    try { localStorage.setItem('wideo-tlo', nowe); } catch { /* wybór tylko na tę rozmowę */ }
+    const av = avRef.current;
+    if (!av || !kamera) return;
+    setTloLaduje(true);
+    try {
+      await uruchomKamere(av, nowe);
+    } catch (e) {
+      setKlopot(rozpoznajKlopot(e));
+    } finally {
+      setTloLaduje(false);
     }
   };
 
@@ -324,7 +418,7 @@ export function VideoPage() {
     <div className="gabinet min-h-[100dvh] flex flex-col text-[#eaf3f0] font-sans">
       <audio ref={dzwiekRef} className="hidden" />
 
-      <header className="flex items-center justify-between gap-4 px-4 sm:px-8 pt-4 sm:pt-6">
+      <header className={`${wRozmowie ? 'hidden sm:flex' : 'flex'} items-center justify-between gap-4 px-4 sm:px-8 pt-4 sm:pt-6`}>
         {wRozmowie ? <span className="w-10" /> : (
           <button
             onClick={doKalendarza}
@@ -431,9 +525,23 @@ export function VideoPage() {
       )}
 
       {/* Rozmowa */}
-      <main className={wRozmowie ? 'flex-1 flex flex-col min-h-0 p-3 sm:p-6' : 'hidden'}>
-        <div className="gabinet-rama relative flex-1 min-h-0 overflow-hidden">
-          <video ref={zdalnyRef} autoPlay playsInline className={`absolute inset-0 w-full h-full object-cover ${obrazDrugiej ? '' : 'invisible'}`} />
+      <main className={wRozmowie ? 'flex-1 flex flex-col min-h-0 sm:p-6' : 'hidden'}>
+        <div className="gabinet-rama gabinet-rozmowa relative flex-1 min-h-0 overflow-hidden">
+          <video
+            ref={zdalnyRef}
+            autoPlay
+            playsInline
+            onLoadedMetadata={sprawdzDopasowanie}
+            onResize={sprawdzDopasowanie}
+            className={`absolute inset-0 w-full h-full ${calyObraz ? 'object-contain' : 'object-cover'} ${obrazDrugiej ? '' : 'invisible'}`}
+          />
+
+          {/* Na telefonie nagłówek leży na obrazie, żeby rozmówca miał cały ekran */}
+          <div className="sm:hidden absolute left-3 right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex">
+            <div className="max-w-full rounded-full bg-[#062321]/70 backdrop-blur px-3.5 py-1.5 text-sm truncate">
+              {rozmowca ?? 'Konsultacja wideo'}{godziny && <span className="text-[#a9c9c2]"> · {godziny}</span>}
+            </div>
+          </div>
 
           {!obrazDrugiej && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
@@ -449,12 +557,12 @@ export function VideoPage() {
             </div>
           )}
 
-          <div className={`absolute right-3 bottom-24 sm:right-5 sm:bottom-5 w-24 sm:w-44 aspect-[3/4] sm:aspect-[4/3] rounded-2xl overflow-hidden bg-[#0d3331] ring-1 ring-white/15 shadow-xl ${kamera ? '' : 'hidden'}`}>
+          <div className={`absolute right-3 sm:right-5 ${wyborTla ? 'top-16 sm:top-5' : 'bottom-[calc(6.5rem+env(safe-area-inset-bottom))] sm:bottom-5'} w-24 sm:w-44 aspect-[3/4] sm:aspect-[4/3] rounded-2xl overflow-hidden bg-[#0d3331] ring-1 ring-white/15 shadow-xl ${kamera ? '' : 'hidden'}`}>
             <video ref={wlasnyRef} autoPlay playsInline muted className="w-full h-full object-cover -scale-x-100" />
           </div>
 
           {(slabeLacze || wznawianie) && (
-            <div role="status" className="absolute top-3 left-3 right-3 sm:left-5 sm:right-auto sm:max-w-sm rounded-2xl bg-[#062321]/85 backdrop-blur px-4 py-3 flex items-start gap-3">
+            <div role="status" className="absolute top-16 left-3 right-3 sm:top-3 sm:left-5 sm:right-auto sm:max-w-sm rounded-2xl bg-[#062321]/85 backdrop-blur px-4 py-3 flex items-start gap-3">
               <WifiOff size={18} className="mt-0.5 shrink-0 text-[#ffd9a1]" />
               <div className="text-sm">
                 {wznawianie ? 'Połączenie się zerwało. Łączę ponownie…' : 'Słabe łącze.'}
@@ -467,14 +575,49 @@ export function VideoPage() {
             </div>
           )}
 
-          <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-3">
-            <div className="flex items-center gap-3 rounded-full bg-[#062321]/70 backdrop-blur px-3 py-2.5">
+          {wyborTla && (
+            <div className="absolute inset-x-3 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] sm:left-auto sm:right-5 sm:bottom-24 sm:w-96 z-10 rounded-3xl bg-[#062321]/90 backdrop-blur p-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Tło za Tobą</p>
+                <button onClick={() => setWyborTla(false)} aria-label="Zamknij wybór tła" className="gabinet-fokus h-8 w-8 rounded-full flex items-center justify-center hover:bg-white/10">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {TLA.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => wybierzTlo(t.id)}
+                    disabled={tloLaduje}
+                    aria-pressed={tlo === t.id}
+                    className={`gabinet-fokus relative aspect-[3/2] rounded-xl overflow-hidden bg-white/10 ring-2 transition-shadow disabled:opacity-60 ${tlo === t.id ? 'ring-[#7fd6c6]' : 'ring-transparent'}`}
+                  >
+                    {t.mini
+                      ? <img src={t.mini} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      : <span className={`absolute inset-0 ${t.id === 'rozmycie' ? 'bg-gradient-to-br from-[#5f8f87] to-[#1d4a47] blur-[1px]' : ''}`} />}
+                    <span className="absolute inset-x-0 bottom-0 bg-black/45 py-0.5 text-[11px] text-white">{t.nazwa}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-[#a9c9c2]">
+                {tloLaduje ? 'Ustawiam tło…' : 'Tło widzisz w swoim okienku. Rozmówca widzi to samo.'}
+              </p>
+            </div>
+          )}
+
+          <div className="absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] flex items-center justify-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3 rounded-full bg-[#062321]/70 backdrop-blur px-3 py-2.5">
               <PrzyciskSprzetu wlaczony={mikrofon} onClick={przelaczMikrofon} etykieta={mikrofon ? 'Wycisz mikrofon' : 'Włącz mikrofon'}>
                 {mikrofon ? <Mic size={20} /> : <MicOff size={20} />}
               </PrzyciskSprzetu>
               <PrzyciskSprzetu wlaczony={kamera} onClick={przelaczKamere} etykieta={kamera ? 'Wyłącz kamerę' : 'Włącz kamerę'} nieczynny={!maKamere}>
                 {kamera ? <Video size={20} /> : <VideoOff size={20} />}
               </PrzyciskSprzetu>
+              {tlaMozliwe && kamera && (
+                <PrzyciskSprzetu wlaczony={!wyborTla} onClick={() => setWyborTla(!wyborTla)} etykieta="Wybierz tło">
+                  <IkonaTla size={20} />
+                </PrzyciskSprzetu>
+              )}
               <button
                 onClick={zakoncz}
                 className="gabinet-fokus h-12 px-5 rounded-full bg-[#d9484f] hover:bg-[#e75d64] text-white font-medium flex items-center gap-2 transition-colors"
